@@ -1,5 +1,5 @@
 // js/main.js
-d3.csv("data/Student_performance_data.csv", d => ({
+d3.csv("Student_performance_data.csv", d => ({
   Age: +d.Age,
   GPA: +d.GPA,
   StudyTimeWeekly: +d.StudyTimeWeekly,
@@ -98,3 +98,115 @@ function drawStudyTimeVsGPA(data) {
     .attr("stroke-width", 2);
 }
 
+//  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
+function drawAgeVsGPA(data) {
+  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  const width = 600 - margin.left - margin.right;
+  const height = 400 - margin.top - margin.bottom;
+
+  const svg = d3.select("#vis-age-gpa")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const bins = [
+    { name: "0–1", min: 0, max: 1 },
+    { name: "1–2", min: 1, max: 2 },
+    { name: "2–3", min: 2, max: 3 },
+    { name: "3–4", min: 3, max: 4.0001 }
+  ];
+
+  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
+
+  // Prepare counts per (bin, age)
+  const counts = [];
+  bins.forEach(bin => {
+    ages.forEach(age => {
+      const count = data.filter(d =>
+        d.Age === age &&
+        d.GPA >= bin.min &&
+        d.GPA < bin.max
+      ).length;
+      counts.push({
+        bin: bin.name,
+        age: age,
+        count: count
+      });
+    });
+  });
+
+  const x0 = d3.scaleBand()
+    .domain(bins.map(b => b.name))
+    .range([0, width])
+    .paddingInner(0.1);
+
+  const x1 = d3.scaleBand()
+    .domain(ages)
+    .range([0, x0.bandwidth()])
+    .padding(0.05);
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(counts, d => d.count)])
+    .nice()
+    .range([height, 0]);
+
+  const color = d3.scaleOrdinal()
+    .domain(ages)
+    .range(d3.schemeTableau10);
+
+  svg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x0));
+
+  svg.append("g").call(d3.axisLeft(y));
+
+  svg.append("text")
+    .attr("x", width / 2)
+    .attr("y", height + 40)
+    .attr("text-anchor", "middle")
+    .text("GPA Range");
+
+  svg.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -height / 2)
+    .attr("y", -35)
+    .attr("text-anchor", "middle")
+    .text("Number of Students");
+
+  const groups = svg.selectAll(".bin-group")
+    .data(bins.map(b => b.name))
+    .enter()
+    .append("g")
+    .attr("class", "bin-group")
+    .attr("transform", d => `translate(${x0(d)},0)`);
+
+  groups.selectAll("rect")
+    .data(binName => counts.filter(c => c.bin === binName))
+    .enter()
+    .append("rect")
+    .attr("x", d => x1(d.age))
+    .attr("y", d => y(d.count))
+    .attr("width", x1.bandwidth())
+    .attr("height", d => height - y(d.count))
+    .attr("fill", d => color(d.age));
+
+  // Simple legend
+  const legend = svg.append("g")
+    .attr("transform", "translate(0,0)");
+
+  ages.forEach((age, i) => {
+    const g = legend.append("g")
+      .attr("transform", `translate(0,${i * 18})`);
+    g.append("rect")
+      .attr("x", width - 120)
+      .attr("width", 12)
+      .attr("height", 12)
+      .attr("fill", color(age));
+    g.append("text")
+      .attr("x", width - 100)
+      .attr("y", 10)
+      .text(`Age ${age}`);
+  });
+}
