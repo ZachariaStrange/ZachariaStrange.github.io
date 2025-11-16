@@ -99,8 +99,11 @@ function drawStudyTimeVsGPA(data) {
 }
 
 //  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
+
 function drawAgeVsGPA(data) {
-  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  console.log("Drawing Age vs GPA");
+
+  const margin = { top: 20, right: 20, bottom: 50, left: 80 };
   const width = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
@@ -120,95 +123,107 @@ function drawAgeVsGPA(data) {
 
   const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
 
-  // Prepare counts per (bin, age)
-  const counts = [];
-  bins.forEach(bin => {
+  const totals = bins.map(bin => {
+    const ageCounts = {};
     ages.forEach(age => {
-      const count = data.filter(d =>
+      ageCounts[age] = data.filter(d =>
         d.Age === age &&
         d.GPA >= bin.min &&
         d.GPA < bin.max
       ).length;
-      counts.push({
-        bin: bin.name,
-        age: age,
-        count: count
-      });
     });
+
+    const total = ages.reduce((sum, age) => sum + ageCounts[age], 0);
+
+    return {
+      bin: bin.name,
+      ageCounts: ageCounts,
+      total: total
+    };
   });
 
-  const x0 = d3.scaleBand()
-    .domain(bins.map(b => b.name))
-    .range([0, width])
-    .paddingInner(0.1);
-
-  const x1 = d3.scaleBand()
-    .domain(ages)
-    .range([0, x0.bandwidth()])
-    .padding(0.05);
-
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(counts, d => d.count)])
+  const x = d3.scaleLinear()
+    .domain([0, d3.max(totals, d => d.total) || 1])
     .nice()
-    .range([height, 0]);
+    .range([0, width]);
+
+  const y = d3.scaleBand()
+    .domain(bins.map(b => b.name))
+    .range([0, height])
+    .padding(0.2);
 
   const color = d3.scaleOrdinal()
     .domain(ages)
-    .range(d3.schemeTableau10);
+    .range(["#c6dbef", "#6baed6", "#3182bd", "#08519c"]);
 
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x0));
+    .call(d3.axisBottom(x));
 
-  svg.append("g").call(d3.axisLeft(y));
+  svg.append("g")
+    .call(d3.axisLeft(y));
 
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + 40)
     .attr("text-anchor", "middle")
-    .text("GPA Range");
+    .text("Number of Students");
 
   svg.append("text")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
-    .attr("y", -35)
+    .attr("y", -60)
     .attr("text-anchor", "middle")
-    .text("Number of Students");
+    .text("GPA Range");
 
   const groups = svg.selectAll(".bin-group")
-    .data(bins.map(b => b.name))
+    .data(totals)
     .enter()
     .append("g")
     .attr("class", "bin-group")
-    .attr("transform", d => `translate(${x0(d)},0)`);
+    .attr("transform", d => `translate(0,${y(d.bin)})`);
 
   groups.selectAll("rect")
-    .data(binName => counts.filter(c => c.bin === binName))
+    .data(d => {
+      let acc = 0;
+      return ages.map(age => {
+        const count = d.ageCounts[age] || 0;
+        const start = acc;
+        acc += count;
+        return {
+          age: age,
+          x0: start,
+          x1: acc
+        };
+      }).filter(seg => seg.x1 > seg.x0);
+    })
     .enter()
     .append("rect")
-    .attr("x", d => x1(d.age))
-    .attr("y", d => y(d.count))
-    .attr("width", x1.bandwidth())
-    .attr("height", d => height - y(d.count))
+    .attr("x", d => x(d.x0))
+    .attr("y", 0)
+    .attr("width", d => x(d.x1) - x(d.x0))
+    .attr("height", y.bandwidth())
     .attr("fill", d => color(d.age));
 
-  // Simple legend
   const legend = svg.append("g")
-    .attr("transform", "translate(0,0)");
+    .attr("transform", `translate(${width - 150}, 0)`);
 
   ages.forEach((age, i) => {
     const g = legend.append("g")
       .attr("transform", `translate(0,${i * 18})`);
+
     g.append("rect")
-      .attr("x", width - 120)
       .attr("width", 12)
       .attr("height", 12)
       .attr("fill", color(age));
+
     g.append("text")
-      .attr("x", width - 100)
+      .attr("x", 18)
       .attr("y", 10)
       .text(`Age ${age}`);
   });
+
+  console.log("Age vs GPA drawn.");
 }
 
 
