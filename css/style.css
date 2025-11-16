@@ -1,1 +1,13 @@
+body {
+  font-family: sans-serif;
+  margin: 20px;
+}
+
+section {
+  margin-bottom: 40px;
+}
+
+svg {
+  border: 1px solid #ccc;
+}
 
