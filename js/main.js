@@ -112,7 +112,7 @@ function drawStudyTimeVsGPA(data) {
 
 
 //  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
-/*
+
 function drawAgeVsGPA(data) {
   console.log("Drawing Age vs GPA (stacked by age)");
 
@@ -129,21 +129,29 @@ function drawAgeVsGPA(data) {
 
   // ---- 1. Get unique ages and GPAs ----
   const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending); // e.g. [15,16,17,18]
-  const gpas = Array.from(new Set(data.map(d => d.GPA))).sort(d3.ascending); // numeric, 0.000 ... 3.920
+  //const gpas = Array.from(new Set(data.map(d => d.GPA))).sort(d3.ascending); // numeric, 0.000 ... 3.920
+  const gpaBin = d3.bin()
+                  .domain([0, 4.0])
+                  .value(d => d.GPA)
+                  .thresholds(40)
+
+  const gpasBinned = gpaBin(data); 
 
   // ---- 2. Build row data: for each GPA, count students by age ----
-  const rows = gpas.map(gpaVal => {
+  const rows = gpasBinned.map(bin => {
     const counts = {};
     let total = 0;
 
     ages.forEach(age => {
-      const count = data.filter(d => d.GPA === gpaVal && d.Age === age).length;
+      const count = bin.filter(d => d.Age === age).length;
       counts[age] = count;
       total += count;
     });
 
     return {
-      gpa: gpaVal,
+      gpa: (bin.x0 + bin.x1) / 2, // This is the midpoint of the GPA bins
+      x0: bin.x0,
+      x1: bin.x1,
       counts,
       total
     };
@@ -251,7 +259,7 @@ function drawAgeVsGPA(data) {
 
   console.log("Age vs GPA drawn (stacked).");
 }
-*/
+
 
 
 
