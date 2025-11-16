@@ -14,7 +14,7 @@ d3.csv("Student_performance_data.csv", d => ({
 
 // Visualization 1: Study Time vs GPA (Scatter with trend line)
 function drawStudyTimeVsGPA(data) {
-  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  const margin = { top: 20, right: 20, bottom: 50, left: 60 };
   const width = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
@@ -25,57 +25,69 @@ function drawStudyTimeVsGPA(data) {
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Scales
+  // -------------------------
+  // SCALES
+  // -------------------------
+
+  // X = GPA
   const x = d3.scaleLinear()
-    .domain(d3.extent(data, d => d.StudyTimeWeekly))
-    .nice()
+    .domain([-0.2, 4.2])
     .range([0, width]);
 
+  // Y = Study Time Weekly
   const y = d3.scaleLinear()
-    .domain([0, 4]) // GPA 0–4
+    .domain([0, 20])
     .nice()
     .range([height, 0]);
 
-  // Axes
+  // -------------------------
+  // AXES
+  // -------------------------
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(d3.axisBottom(x));
 
-  svg.append("g").call(d3.axisLeft(y));
+  svg.append("g")
+    .call(d3.axisLeft(y));
 
   // Axis labels
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + 40)
     .attr("text-anchor", "middle")
-    .text("Study Time Weekly (hours)");
+    .text("GPA");
 
   svg.append("text")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
-    .attr("y", -35)
+    .attr("y", -45)
     .attr("text-anchor", "middle")
-    .text("GPA");
+    .text("Study Time Weekly (hours)");
 
-  // Points
+  // -------------------------
+  // POINTS
+  // -------------------------
   svg.selectAll("circle")
     .data(data)
     .enter()
     .append("circle")
-    .attr("cx", d => x(d.StudyTimeWeekly))
-    .attr("cy", d => y(d.GPA))
+    .attr("cx", d => x(d.GPA))
+    .attr("cy", d => y(d.StudyTimeWeekly))
     .attr("r", 3)
     .attr("fill", "steelblue")
     .attr("opacity", 0.6);
 
-  // --- Simple linear regression for trend line ---
-  const xMean = d3.mean(data, d => d.StudyTimeWeekly);
-  const yMean = d3.mean(data, d => d.GPA);
+  // -------------------------
+  // TREND LINE
+  // -------------------------
+
+  const xMean = d3.mean(data, d => d.GPA);
+  const yMean = d3.mean(data, d => d.StudyTimeWeekly);
 
   let num = 0, den = 0;
   data.forEach(d => {
-    const xDev = d.StudyTimeWeekly - xMean;
-    const yDev = d.GPA - yMean;
+    const xDev = d.GPA - xMean;
+    const yDev = d.StudyTimeWeekly - yMean;
     num += xDev * yDev;
     den += xDev * xDev;
   });
@@ -83,7 +95,7 @@ function drawStudyTimeVsGPA(data) {
   const slope = num / den;
   const intercept = yMean - slope * xMean;
 
-  const xVals = d3.extent(data, d => d.StudyTimeWeekly);
+  const xVals = [-0.2, 4.2];
   const linePoints = xVals.map(xv => ({
     x: xv,
     y: slope * xv + intercept
@@ -98,10 +110,11 @@ function drawStudyTimeVsGPA(data) {
     .attr("stroke-width", 2);
 }
 
-//  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
 
+//  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
+/*
 function drawAgeVsGPA(data) {
-  console.log("Drawing Age vs GPA");
+  console.log("Drawing Age vs GPA (stacked by age)");
 
   const margin = { top: 20, right: 20, bottom: 50, left: 80 };
   const width = 600 - margin.left - margin.right;
@@ -114,80 +127,92 @@ function drawAgeVsGPA(data) {
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  const bins = [
-    { name: "0–1", min: 0, max: 1 },
-    { name: "1–2", min: 1, max: 2 },
-    { name: "2–3", min: 2, max: 3 },
-    { name: "3–4", min: 3, max: 4.0001 }
-  ];
+  // ---- 1. Get unique ages and GPAs ----
+  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending); // e.g. [15,16,17,18]
+  const gpas = Array.from(new Set(data.map(d => d.GPA))).sort(d3.ascending); // numeric, 0.000 ... 3.920
 
-  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
+  // ---- 2. Build row data: for each GPA, count students by age ----
+  const rows = gpas.map(gpaVal => {
+    const counts = {};
+    let total = 0;
 
-  const totals = bins.map(bin => {
-    const ageCounts = {};
     ages.forEach(age => {
-      ageCounts[age] = data.filter(d =>
-        d.Age === age &&
-        d.GPA >= bin.min &&
-        d.GPA < bin.max
-      ).length;
+      const count = data.filter(d => d.GPA === gpaVal && d.Age === age).length;
+      counts[age] = count;
+      total += count;
     });
 
-    const total = ages.reduce((sum, age) => sum + ageCounts[age], 0);
-
     return {
-      bin: bin.name,
-      ageCounts: ageCounts,
-      total: total
+      gpa: gpaVal,
+      counts,
+      total
     };
-  });
+  }).filter(r => r.total > 0); // drop GPA values with no students
 
+  if (rows.length === 0) {
+    console.warn("No data for Age vs GPA.");
+    return;
+  }
+
+  // ---- 3. Scales ----
+
+  // x-axis: count of students (length of stacked bar)
   const x = d3.scaleLinear()
-    .domain([0, d3.max(totals, d => d.total) || 1])
+    .domain([0, d3.max(rows, d => d.total)]) // max total count across GPAs
     .nice()
     .range([0, width]);
 
+  // y-axis: GPA bins, 0 at top, highest at bottom (band scale)
   const y = d3.scaleBand()
-    .domain(bins.map(b => b.name))
-    .range([0, height])
-    .padding(0.2);
+    .domain(rows.map(r => r.gpa)) // numeric GPAs
+    .range([0, height])           // 0 at top, height at bottom
+    .padding(0.1);
 
+  // Color by age: dark blue, light blue, yellow, dark red
   const color = d3.scaleOrdinal()
     .domain(ages)
-    .range(["#c6dbef", "#6baed6", "#3182bd", "#08519c"]);
+    .range(["#08306b", "#6baed6", "#ffd92f", "#b30000"]);
+
+  // ---- 4. Axes ----
+  const xAxis = d3.axisBottom(x);
+  const yAxis = d3.axisLeft(y).tickFormat(d3.format(".3f")); // show 0.000, 0.140, ... etc.
 
   svg.append("g")
     .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x));
+    .call(xAxis);
 
   svg.append("g")
-    .call(d3.axisLeft(y));
+    .call(yAxis);
 
+  // Axis labels
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + 40)
     .attr("text-anchor", "middle")
-    .text("Number of Students");
+    .text("Count of Students (by age)");
 
   svg.append("text")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
     .attr("y", -60)
     .attr("text-anchor", "middle")
-    .text("GPA Range");
+    .text("GPA");
 
-  const groups = svg.selectAll(".bin-group")
-    .data(totals)
+  // ---- 5. Draw stacked horizontal bars ----
+
+  const rowGroups = svg.selectAll(".gpa-row")
+    .data(rows)
     .enter()
     .append("g")
-    .attr("class", "bin-group")
-    .attr("transform", d => `translate(0,${y(d.bin)})`);
+    .attr("class", "gpa-row")
+    .attr("transform", d => `translate(0,${y(d.gpa)})`);
 
-  groups.selectAll("rect")
+  rowGroups.selectAll("rect")
     .data(d => {
       let acc = 0;
+      // Build segments in a fixed age order
       return ages.map(age => {
-        const count = d.ageCounts[age] || 0;
+        const count = d.counts[age] || 0;
         const start = acc;
         acc += count;
         return {
@@ -195,7 +220,7 @@ function drawAgeVsGPA(data) {
           x0: start,
           x1: acc
         };
-      }).filter(seg => seg.x1 > seg.x0);
+      }).filter(seg => seg.x1 > seg.x0); // ignore zero-length segments
     })
     .enter()
     .append("rect")
@@ -205,6 +230,7 @@ function drawAgeVsGPA(data) {
     .attr("height", y.bandwidth())
     .attr("fill", d => color(d.age));
 
+  // ---- 6. Legend for ages ----
   const legend = svg.append("g")
     .attr("transform", `translate(${width - 150}, 0)`);
 
@@ -223,107 +249,16 @@ function drawAgeVsGPA(data) {
       .text(`Age ${age}`);
   });
 
-  console.log("Age vs GPA drawn.");
+  console.log("Age vs GPA drawn (stacked).");
 }
+*/
 
 
-function drawParentalInfluence(data) {
-  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
-  const width = 600 - margin.left - margin.right;
-  const height = 400 - margin.top - margin.bottom;
 
-  const svg = d3.select("#vis-parental-gpa")
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  const bins = [
-    { name: "0–1", min: 0, max: 1 },
-    { name: "1–2", min: 1, max: 2 },
-    { name: "2–3", min: 2, max: 3 },
-    { name: "3–4", min: 3, max: 4.0001 }
-  ];
 
-  const stats = bins.map(bin => {
-    const subset = data.filter(d => d.GPA >= bin.min && d.GPA < bin.max);
-    return {
-      bin: bin.name,
-      meanEd: d3.mean(subset, d => d.ParentalEducation) || 0,
-      meanSup: d3.mean(subset, d => d.ParentalSupport) || 0
-    };
-  });
 
-  const x = d3.scalePoint()
-    .domain(bins.map(b => b.name))
-    .range([0, width])
-    .padding(0.5);
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(stats, d => Math.max(d.meanEd, d.meanSup))])
-    .nice()
-    .range([height, 0]);
 
-  svg.append("g")
-    .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x));
 
-  svg.append("g").call(d3.axisLeft(y));
-
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", height + 40)
-    .attr("text-anchor", "middle")
-    .text("GPA Range");
-
-  svg.append("text")
-    .attr("transform", "rotate(-90)")
-    .attr("x", -height / 2)
-    .attr("y", -35)
-    .attr("text-anchor", "middle")
-    .text("Average Parental Influence");
-
-  const line = d3.line()
-    .x(d => x(d.bin))
-    .y(d => y(d.value));
-
-  const edData = stats.map(d => ({ bin: d.bin, value: d.meanEd }));
-  const supData = stats.map(d => ({ bin: d.bin, value: d.meanSup }));
-
-  svg.append("path")
-    .datum(edData)
-    .attr("fill", "none")
-    .attr("stroke", "steelblue")
-    .attr("stroke-width", 2)
-    .attr("d", line);
-
-  svg.append("path")
-    .datum(supData)
-    .attr("fill", "none")
-    .attr("stroke", "orange")
-    .attr("stroke-width", 2)
-    .attr("d", line);
-
-  const legend = svg.append("g")
-    .attr("transform", `translate(${width - 150}, 0)`);
-
-  const items = [
-    { label: "Parental Education", color: "steelblue" },
-    { label: "Parental Support", color: "orange" }
-  ];
-
-  items.forEach((item, i) => {
-    const g = legend.append("g")
-      .attr("transform", `translate(0,${i * 18})`);
-    g.append("rect")
-      .attr("width", 12)
-      .attr("height", 12)
-      .attr("fill", item.color);
-    g.append("text")
-      .attr("x", 18)
-      .attr("y", 10)
-      .text(item.label);
-  });
-}
 
