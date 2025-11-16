@@ -1,4 +1,3 @@
-// js/main.js
 d3.csv("Student_performance_data.csv", d => ({
   Age: +d.Age,
   GPA: +d.GPA,
