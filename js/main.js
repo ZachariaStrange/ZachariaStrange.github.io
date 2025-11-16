@@ -210,3 +210,105 @@ function drawAgeVsGPA(data) {
       .text(`Age ${age}`);
   });
 }
+
+
+function drawParentalInfluence(data) {
+  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  const width = 600 - margin.left - margin.right;
+  const height = 400 - margin.top - margin.bottom;
+
+  const svg = d3.select("#vis-parental-gpa")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const bins = [
+    { name: "0–1", min: 0, max: 1 },
+    { name: "1–2", min: 1, max: 2 },
+    { name: "2–3", min: 2, max: 3 },
+    { name: "3–4", min: 3, max: 4.0001 }
+  ];
+
+  const stats = bins.map(bin => {
+    const subset = data.filter(d => d.GPA >= bin.min && d.GPA < bin.max);
+    return {
+      bin: bin.name,
+      meanEd: d3.mean(subset, d => d.ParentalEducation) || 0,
+      meanSup: d3.mean(subset, d => d.ParentalSupport) || 0
+    };
+  });
+
+  const x = d3.scalePoint()
+    .domain(bins.map(b => b.name))
+    .range([0, width])
+    .padding(0.5);
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(stats, d => Math.max(d.meanEd, d.meanSup))])
+    .nice()
+    .range([height, 0]);
+
+  svg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x));
+
+  svg.append("g").call(d3.axisLeft(y));
+
+  svg.append("text")
+    .attr("x", width / 2)
+    .attr("y", height + 40)
+    .attr("text-anchor", "middle")
+    .text("GPA Range");
+
+  svg.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -height / 2)
+    .attr("y", -35)
+    .attr("text-anchor", "middle")
+    .text("Average Parental Influence");
+
+  const line = d3.line()
+    .x(d => x(d.bin))
+    .y(d => y(d.value));
+
+  const edData = stats.map(d => ({ bin: d.bin, value: d.meanEd }));
+  const supData = stats.map(d => ({ bin: d.bin, value: d.meanSup }));
+
+  svg.append("path")
+    .datum(edData)
+    .attr("fill", "none")
+    .attr("stroke", "steelblue")
+    .attr("stroke-width", 2)
+    .attr("d", line);
+
+  svg.append("path")
+    .datum(supData)
+    .attr("fill", "none")
+    .attr("stroke", "orange")
+    .attr("stroke-width", 2)
+    .attr("d", line);
+
+  const legend = svg.append("g")
+    .attr("transform", `translate(${width - 150}, 0)`);
+
+  const items = [
+    { label: "Parental Education", color: "steelblue" },
+    { label: "Parental Support", color: "orange" }
+  ];
+
+  items.forEach((item, i) => {
+    const g = legend.append("g")
+      .attr("transform", `translate(0,${i * 18})`);
+    g.append("rect")
+      .attr("width", 12)
+      .attr("height", 12)
+      .attr("fill", item.color);
+    g.append("text")
+      .attr("x", 18)
+      .attr("y", 10)
+      .text(item.label);
+  });
+}
+
