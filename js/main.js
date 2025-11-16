@@ -258,8 +258,11 @@ function drawAgeVsGPA(data) {
 
   console.log("Age vs GPA drawn (stacked).");
 }
+function drawParentalInfluence(){
+  //Parental Influence on GPA (Grouped bars by Parental Education and Support)
 
 
+}
 
 
 
