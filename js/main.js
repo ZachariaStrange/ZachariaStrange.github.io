@@ -239,7 +239,7 @@ function drawAgeVsGPA(data) {
 
   // ---- Legend for ages ----
   const legend = svg.append("g")
-    .attr("transform", `translate(${width - 150}, 0)`);
+    .attr("transform", `translate(${width - 100}, 0)`);
 
   ages.forEach((age, i) => {
     const g = legend.append("g")
