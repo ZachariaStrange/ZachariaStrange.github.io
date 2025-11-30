@@ -9,5 +9,7 @@ section {
 
 svg {
   border: 1px solid #ccc;
+  transform: scale(0.6);
+
 }
 
