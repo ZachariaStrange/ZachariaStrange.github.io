@@ -353,7 +353,7 @@ function drawParentalInfluence(data) {
     .attr("x", width / 2)
     .attr("y", height + 40)
     .attr("text-anchor", "middle")
-    .text("GPA (bin)");
+    .text("GPA");
 
   svg.append("text")
     .attr("transform", "rotate(-90)")
