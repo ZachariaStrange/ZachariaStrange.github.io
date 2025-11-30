@@ -9,31 +9,39 @@
 <body>
   <h1>Student Performance Dashboard</h1>
 
-  <!-- One section that holds all three charts horizontally -->
-  <section 
-    style="
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 10px;
-    "
-  >
-    <div style="flex: 1; min-width: 0;">
-      <h2>1. Study Time vs GPA</h2>
-      <div id="vis-studytime-gpa"></div>
+  <div class="dashboard">
+
+    <div class="top-row">
+      <div class="card">
+        <h2>Study Time vs GPA</h2>
+        <div id="vis-studytime-gpa"></div>
+      </div>
+
+      <div class="card">
+        <h2>Age vs GPA</h2>
+        <div id="vis-age-gpa"></div>
+      </div>
+
+      <div class="card">
+        <h2>Parental Influence vs GPA</h2>
+        <div id="vis-parental-gpa"></div>
+      </div>
     </div>
 
-    <div style="flex: 1; min-width: 0;">
-      <h2>2. Age vs GPA</h2>
-      <div id="vis-age-gpa"></div>
+    <!-- 
+    <div class="bottom-row">
+      <div class="card large">
+        <h2>Some Bigger Chart</h2>
+        <div id="vis-bottom-left"></div>
+      </div>
+      <div class="card large">
+        <h2>Another Bigger Chart</h2>
+        <div id="vis-bottom-right"></div>
+      </div>
     </div>
+    -->
 
-    <div style="flex: 1; min-width: 0;">
-      <h2>3. Parental Influence vs GPA</h2>
-      <div id="vis-parental-gpa"></div>
-    </div>
-  </section>
+  </div>
 
   <script src="js/main.js"></script>
 </body>
