@@ -297,8 +297,7 @@ function drawAgeVsGPA(data) {
   console.log("Age vs GPA drawn (stacked with hover interaction).");
 }
 
-
-// Visualization 3: Effect of Parental Education/Support on GPA
+// Visualization 3: Effect of Parental Education/Support on GPA (with hover interaction)
 function drawParentalInfluence(data) {
   console.log("Drawing Effect of Parental Education/Support on GPA");
 
@@ -342,8 +341,6 @@ function drawParentalInfluence(data) {
   // ---------------------------------
   // Scales
   // ---------------------------------
-
-  // X = GPA (continuous), for axis & bar positions
   const x = d3.scaleLinear()
     .domain([0, 4.5])
     .range([0, width]);
@@ -409,10 +406,22 @@ function drawParentalInfluence(data) {
     .text("Parental Support");
 
   // ---------------------------------
+  // Hover text (similar idea to "Count per year")
+  // ---------------------------------
+  const hoverText = svg.append("text")
+    .attr("id", "parental-hover-text")
+    .attr("x", width - 10)
+    .attr("y", 0)
+    .attr("text-anchor", "end")
+    .style("font-size", "12px")
+    .style("fill", "#333")
+    .text("Hover over a bar");
+
+  // ---------------------------------
   // Bars
   // ---------------------------------
 
-  // Blue bars: Parental Education (left axis), drawn on top & narrower
+  // Blue bars: Parental Education
   svg.selectAll(".bar-education")
     .data(rows)
     .enter()
@@ -420,11 +429,33 @@ function drawParentalInfluence(data) {
     .attr("class", "bar-education")
     .attr("x", d => x(d.center) - eduBarWidth)
     .attr("y", d => yLeft(Math.min(d.eduSum, 160)))
-    .attr("width", eduBarWidth*2)
+    .attr("width", eduBarWidth * 2)
     .attr("height", d => height - yLeft(Math.min(d.eduSum, 160)))
-    .attr("fill", "#1f77b4");
+    .attr("fill", "#1f77b4")
+    .attr("opacity", 0.9)
+    .on("mouseover", function (event, d) {
+      svg.selectAll(".bar-education, .bar-support")
+        .attr("opacity", 0.3)
+        .attr("stroke", "none");
 
-     // Orange bars: Parental Support (right axis)
+      d3.select(this)
+        .attr("opacity", 1.0)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5);
+
+      hoverText.text(
+        `GPA ~ ${d.center.toFixed(2)} | Education: ${d.eduSum.toFixed(1)}, Support: ${d.supSum.toFixed(1)}`
+      );
+    })
+    .on("mouseout", function () {
+      svg.selectAll(".bar-education, .bar-support")
+        .attr("opacity", 0.9)
+        .attr("stroke", "none");
+
+      hoverText.text("Hover over a bar");
+    });
+
+  // Orange bars: Parental Support
   svg.selectAll(".bar-support")
     .data(rows)
     .enter()
@@ -434,7 +465,29 @@ function drawParentalInfluence(data) {
     .attr("y", d => yRight(Math.min(d.supSum, 200)))
     .attr("width", supBarWidth)
     .attr("height", d => height - yRight(Math.min(d.supSum, 200)))
-    .attr("fill", "#ff7f00");
+    .attr("fill", "#ff7f00")
+    .attr("opacity", 0.9)
+    .on("mouseover", function (event, d) {
+      svg.selectAll(".bar-education, .bar-support")
+        .attr("opacity", 0.3)
+        .attr("stroke", "none");
+
+      d3.select(this)
+        .attr("opacity", 1.0)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5);
+
+      hoverText.text(
+        `GPA ~ ${d.center.toFixed(2)} | Support: ${d.supSum.toFixed(1)}, Education: ${d.eduSum.toFixed(1)}`
+      );
+    })
+    .on("mouseout", function () {
+      svg.selectAll(".bar-education, .bar-support")
+        .attr("opacity", 0.9)
+        .attr("stroke", "none");
+
+      hoverText.text("Hover over a bar");
+    });
 
   // ---------------------------------
   // Legend (right side)
@@ -462,13 +515,5 @@ function drawParentalInfluence(data) {
       .text(item.label);
   });
 
-  console.log("Effect of Parental Education/Support on GPA drawn.");
+  console.log("Effect of Parental Education/Support on GPA drawn (with hover interaction).");
 }
-
-
-
-
-
-
-
-
