@@ -121,7 +121,7 @@ const ageText = svg.append("text")
 // The age cycle order
 const ages = [15, 16, 17, 18, null];
 
-// IMPORTANT: persistent index
+// IMPORTANT: persistent index (took me too long to figure that out)
 let currentAgeIndex = 0;
 
 AgeToggle.addEventListener("click", () => {
@@ -138,8 +138,7 @@ AgeToggle.addEventListener("click", () => {
     }
 
     // Filter dataset
-    const filteredData = selectedAge === null
-        ? data
+    const filteredData = selectedAge === null ? data
         : data.filter(d => d.Age === selectedAge);
 
     // Clear & redraw circles
@@ -153,6 +152,37 @@ AgeToggle.addEventListener("click", () => {
         .attr("r", 3)
         .attr("fill", "steelblue")
         .attr("opacity", 0.6);
+
+    // Clear & redraw trend line
+    svg.selectAll("line").remove();
+    if (filteredData.length > 1) {
+        const xMean2 = d3.mean(filteredData, d => d.GPA);
+        const yMean2 = d3.mean(filteredData, d => d.StudyTimeWeekly);
+
+        let num2 = 0, den2 = 0;
+        filteredData.forEach(d => {
+            const xDev = d.GPA - xMean2;
+            const yDev = d.StudyTimeWeekly - yMean2;
+            num2 += xDev * yDev;
+            den2 += xDev * xDev;
+        });
+
+        const slopeF = num2 / den2;
+        const interceptF = yMean2 - slopeF * xMean2;
+
+        const linePoints2 = xVals.map(xv => ({
+            x: xv,
+            y: slopeF * xv + interceptF
+        }));
+
+        svg.append("line")
+            .attr("x1", x(linePoints2[0].x))
+            .attr("y1", y(linePoints2[0].y))
+            .attr("x2", x(linePoints2[1].x))
+            .attr("y2", y(linePoints2[1].y))
+            .attr("stroke", "darkred")
+            .attr("stroke-width", 2);
+    }
 });
 }
 //  Visualization 2: Age vs GPA (stacked by age, with hover + legend filter)
