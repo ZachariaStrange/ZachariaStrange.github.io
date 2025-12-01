@@ -363,19 +363,18 @@ applyAgeFilter();
   console.log("Age vs GPA drawn (stacked with hover + legend filter).");
 }
 
-
-// Visualization 3: Effect of Parental Education/Support on GPA (with hover interaction)
+// Visualization 3: Effect of Parental Education/Support on GPA (with legend series toggle)
 function drawParentalInfluence(data) {
   console.log("Drawing Effect of Parental Education/Support on GPA");
 
   const margin = { top: 20, right: 60, bottom: 50, left: 60 };
-  const width = 600 - margin.left - margin.right;
+  const width  = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
   const svg = d3.select("#vis-parental-gpa")
     .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+    .attr("width",  width  + margin.left + margin.right)
+    .attr("height", height + margin.top  + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -385,54 +384,47 @@ function drawParentalInfluence(data) {
   const binGen = d3.bin()
     .domain([0, 4.0])
     .value(d => d.GPA)
-    .thresholds(d3.range(0, 4.0000, 0.1));
+    .thresholds(d3.range(0, 4.0, 0.1));
 
   const bins = binGen(data);
 
   const rows = bins.map(bin => {
     const eduSum = d3.sum(bin, d => d.ParentalEducation) || 0;
-    const supSum = d3.sum(bin, d => d.ParentalSupport) || 0;
-    const x0 = bin.x0 ?? 0;
-    const x1 = bin.x1 ?? 0;
+    const supSum = d3.sum(bin, d => d.ParentalSupport)   || 0;
+    const x0     = (bin.x0 === undefined ? 0 : bin.x0);
+    const x1     = (bin.x1 === undefined ? 0 : bin.x1);
     const center = (x0 + x1) / 2;
+    return { x0, x1, center, eduSum, supSum };
+  }).filter(r => (r.eduSum > 0 || r.supSum > 0));
 
-    return {
-      x0,
-      x1,
-      center,
-      eduSum,
-      supSum
-    };
-  });
+  if (!rows.length) {
+    console.warn("No data for Parental Influence.");
+    return;
+  }
 
   // ---------------------------------
   // Scales
   // ---------------------------------
-
-  // X = GPA (continuous), for axis & bar positions
   const x = d3.scaleLinear()
     .domain([0, 4.5])
     .range([0, width]);
 
-  // Width of one GPA bin (all bins equal width)
-  const binWidth = x(rows[0].x1) - x(rows[0].x0);
+  const binWidth    = x(rows[0].x1) - x(rows[0].x0);
   const supBarWidth = binWidth * 0.9;
   const eduBarWidth = binWidth * 0.4;
 
-  // Left Y: Parental Education 0–160
   const yLeft = d3.scaleLinear()
     .domain([0, 160])
     .range([height, 0]);
 
-  // Right Y: Parental Support 0–200
   const yRight = d3.scaleLinear()
     .domain([0, 200])
     .range([height, 0]);
 
   // ---------------------------------
-  // Axes
+  // Axes (keep references so we can hide/show)
   // ---------------------------------
-  svg.append("g")
+  const xAxisG = svg.append("g")
     .attr("transform", `translate(0,${height})`)
     .call(
       d3.axisBottom(x)
@@ -440,13 +432,15 @@ function drawParentalInfluence(data) {
         .tickFormat(d3.format(".1f"))
     );
 
-  svg.append("g")
+  const yLeftAxisG = svg.append("g")
+    .attr("class", "y-axis-left")
     .call(
       d3.axisLeft(yLeft)
         .tickValues([0, 20, 40, 60, 80, 100, 120, 140, 160])
     );
 
-  svg.append("g")
+  const yRightAxisG = svg.append("g")
+    .attr("class", "y-axis-right")
     .attr("transform", `translate(${width},0)`)
     .call(
       d3.axisRight(yRight)
@@ -460,14 +454,16 @@ function drawParentalInfluence(data) {
     .attr("text-anchor", "middle")
     .text("GPA");
 
-  svg.append("text")
+  const eduLabel = svg.append("text")
+    .attr("class", "label-edu")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
     .attr("y", -45)
     .attr("text-anchor", "middle")
     .text("Parental Education");
 
-  svg.append("text")
+  const supLabel = svg.append("text")
+    .attr("class", "label-sup")
     .attr("transform", "rotate(90)")
     .attr("x", height / 2)
     .attr("y", -width - 45)
@@ -475,12 +471,12 @@ function drawParentalInfluence(data) {
     .text("Parental Support");
 
   // ---------------------------------
-  // Hover text (similar idea to "Count per year")
+  // Hover text
   // ---------------------------------
   const hoverText = svg.append("text")
     .attr("id", "parental-hover-text")
     .attr("x", width - 10)
-    .attr("y", 0)
+    .attr("y", -2)
     .attr("text-anchor", "end")
     .style("font-size", "12px")
     .style("fill", "#333")
@@ -489,9 +485,7 @@ function drawParentalInfluence(data) {
   // ---------------------------------
   // Bars
   // ---------------------------------
-
-  // Blue bars: Parental Education
-  svg.selectAll(".bar-education")
+  const eduBars = svg.selectAll(".bar-education")
     .data(rows)
     .enter()
     .append("rect")
@@ -503,12 +497,7 @@ function drawParentalInfluence(data) {
     .attr("fill", "#1f77b4")
     .attr("opacity", 0.9)
     .on("mouseover", function (event, d) {
-      svg.selectAll(".bar-education, .bar-support")
-        .attr("opacity", 0.3)
-        .attr("stroke", "none");
-
       d3.select(this)
-        .attr("opacity", 1.0)
         .attr("stroke", "black")
         .attr("stroke-width", 1.5);
 
@@ -517,15 +506,13 @@ function drawParentalInfluence(data) {
       );
     })
     .on("mouseout", function () {
-      svg.selectAll(".bar-education, .bar-support")
-        .attr("opacity", 0.9)
-        .attr("stroke", "none");
-
-      hoverText.text("Hover over a bar");
+      d3.select(this).attr("stroke", "none");
+      if (selectedSeries === null) {
+        hoverText.text("Hover over a bar");
+      }
     });
 
-  // Orange bars: Parental Support
-  svg.selectAll(".bar-support")
+  const supBars = svg.selectAll(".bar-support")
     .data(rows)
     .enter()
     .append("rect")
@@ -537,12 +524,7 @@ function drawParentalInfluence(data) {
     .attr("fill", "#ff7f00")
     .attr("opacity", 0.9)
     .on("mouseover", function (event, d) {
-      svg.selectAll(".bar-education, .bar-support")
-        .attr("opacity", 0.3)
-        .attr("stroke", "none");
-
       d3.select(this)
-        .attr("opacity", 1.0)
         .attr("stroke", "black")
         .attr("stroke-width", 1.5);
 
@@ -551,38 +533,114 @@ function drawParentalInfluence(data) {
       );
     })
     .on("mouseout", function () {
-      svg.selectAll(".bar-education, .bar-support")
-        .attr("opacity", 0.9)
-        .attr("stroke", "none");
-
-      hoverText.text("Hover over a bar");
+      d3.select(this).attr("stroke", "none");
+      if (selectedSeries === null) {
+        hoverText.text("Hover over a bar");
+      }
     });
 
   // ---------------------------------
-  // Legend (right side)
+  // Legend + series toggle
   // ---------------------------------
+  const legendData = [
+    { key: "edu", label: "Parental Education", color: "#1f77b4" },
+    { key: "sup", label: "Parental Support",   color: "#ff7f00" }
+  ];
+
+  let selectedSeries = null; // null = both; "edu" or "sup"
+
+  function applySeriesFilter() {
+    if (selectedSeries === null) {
+      // show both series & both axes
+      eduBars.attr("opacity", 0.9);
+      supBars.attr("opacity", 0.9);
+
+      yLeftAxisG.style("display", null);
+      yRightAxisG.style("display", null);
+      eduLabel.style("display", null);
+      supLabel.style("display", null);
+
+      hoverText.text("Hover over a bar");
+    } else if (selectedSeries === "edu") {
+      // only education visible
+      eduBars.attr("opacity", 0.9);
+      supBars.attr("opacity", 0.0);
+
+      yLeftAxisG.style("display", null);
+      yRightAxisG.style("display", "none");
+      eduLabel.style("display", null);
+      supLabel.style("display", "none");
+
+    } else if (selectedSeries === "sup") {
+      // only support visible
+      eduBars.attr("opacity", 0.0);
+      supBars.attr("opacity", 0.9);
+
+      yLeftAxisG.style("display", "none");
+      yRightAxisG.style("display", null);
+      eduLabel.style("display", "none");
+      supLabel.style("display", null);
+
+    }
+
+    // Update legend styling
+    legendItems.select("rect.legend-swatch")
+      .attr("stroke", d => (selectedSeries === d.key ? "black" : "none"))
+      .attr("stroke-width", d => (selectedSeries === d.key ? 2 : 0));
+
+    legendItems.select("text.legend-label")
+      .style("font-weight", d => (selectedSeries === d.key ? "bold" : "normal"))
+      .style("fill", d => (selectedSeries === d.key ? "#000" : "#444"));
+  }
+
   const legend = svg.append("g")
     .attr("transform", `translate(${width - 160}, 10)`);
 
-  const items = [
-    { label: "Parental Education", color: "#1f77b4" },
-    { label: "Parental Support",   color: "#ff7f00" }
-  ];
+  const legendItems = legend.selectAll(".legend-item")
+    .data(legendData)
+    .enter()
+    .append("g")
+    .attr("class", "legend-item")
+    .attr("transform", (d, i) => `translate(0, ${i * 20})`)
+    .style("cursor", "pointer")
+    // Click: toggle which series is shown
+    .on("click", (event, d) => {
+      if (selectedSeries === d.key) {
+        selectedSeries = null;   // turn filter off, show both
+      } else {
+        selectedSeries = d.key;  // show only this series
+      }
+      applySeriesFilter();
+    })
+    // Hover: highlight ONLY this legend item (no graph change)
+    .on("mouseover", function () {
+      d3.select(this).select("rect.legend-swatch")
+        .attr("stroke", "black")
+        .attr("stroke-width", 2);
 
-  items.forEach((item, i) => {
-    const g = legend.append("g")
-      .attr("transform", `translate(0,${i * 20})`);
+      d3.select(this).select("text.legend-label")
+        .style("font-weight", "bold")
+        .style("fill", "#000");
+    })
+    .on("mouseout", function () {
+      // restore styling to match selectedSeries
+      applySeriesFilter();
+    });
 
-    g.append("rect")
-      .attr("width", 14)
-      .attr("height", 14)
-      .attr("fill", item.color);
+  legendItems.append("rect")
+    .attr("class", "legend-swatch")
+    .attr("width", 14)
+    .attr("height", 14)
+    .attr("fill", d => d.color);
 
-    g.append("text")
-      .attr("x", 20)
-      .attr("y", 11)
-      .text(item.label);
-  });
+  legendItems.append("text")
+    .attr("class", "legend-label")
+    .attr("x", 20)
+    .attr("y", 11)
+    .text(d => d.label);
 
-  console.log("Effect of Parental Education/Support on GPA drawn (with hover interaction).");
+  // initial state: show both series
+  applySeriesFilter();
+
+  console.log("Effect of Parental Education/Support on GPA drawn (with legend series toggle).");
 }
