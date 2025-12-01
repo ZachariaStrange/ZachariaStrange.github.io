@@ -341,6 +341,8 @@ function drawParentalInfluence(data) {
   // ---------------------------------
   // Scales
   // ---------------------------------
+
+  // X = GPA (continuous), for axis & bar positions
   const x = d3.scaleLinear()
     .domain([0, 4.5])
     .range([0, width]);
