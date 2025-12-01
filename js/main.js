@@ -109,9 +109,7 @@ function drawStudyTimeVsGPA(data) {
     .attr("stroke-width", 2);
 }
 
-
-//  Visualization 2: Age vs GPA (Grouped bars by GPA bins)
-
+//  Visualization 2: Age vs GPA (stacked by age, with hover interaction)
 function drawAgeVsGPA(data) {
   console.log("Drawing Age vs GPA (stacked by age)");
 
@@ -126,17 +124,17 @@ function drawAgeVsGPA(data) {
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // ---- Get unique ages and GPAs ----
-  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending); // e.g. [15,16,17,18]
-  //const gpas = Array.from(new Set(data.map(d => d.GPA))).sort(d3.ascending); // numeric, 0.000 ... 3.920
+  // ---- Get unique ages and create GPA bins ----
+  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
+
   const gpaBin = d3.bin()
-                  .domain([0, 4.0])
-                  .value(d => d.GPA)
-                  .thresholds(40)
+    .domain([0, 4.0])
+    .value(d => d.GPA)
+    .thresholds(40);
 
-  const gpasBinned = gpaBin(data); 
+  const gpasBinned = gpaBin(data);
 
-  // ---- Build row data: for each GPA, count students by age ----
+  // ---- Build row data: for each GPA bin, count students by age ----
   const rows = gpasBinned.map(bin => {
     const counts = {};
     let total = 0;
@@ -148,13 +146,13 @@ function drawAgeVsGPA(data) {
     });
 
     return {
-      gpa: (bin.x0 + bin.x1) / 2, // This is the midpoint of the GPA bins
+      gpa: (bin.x0 + bin.x1) / 2,
       x0: bin.x0,
       x1: bin.x1,
       counts,
       total
     };
-  }).filter(r => r.total > 0); // drop GPA values with no students
+  }).filter(r => r.total > 0); // drop empty bins
 
   if (rows.length === 0) {
     console.warn("No data for Age vs GPA.");
@@ -165,22 +163,22 @@ function drawAgeVsGPA(data) {
 
   // x-axis: count of students (length of stacked bar)
   const x = d3.scaleLinear()
-    .domain([0, d3.max(rows, d => d.total)]) // max total count across GPAs
+    .domain([0, d3.max(rows, d => d.total)])
     .nice()
     .range([0, width]);
 
-  // y-axis: GPA bins, 0 at top, highest at bottom (band scale)
+  // y-axis: GPA bins (as band scale)
   const y = d3.scaleBand()
-    .domain(rows.map(r => r.gpa)) // numeric GPAs
-    .range([0, height])           // 0 at top, height at bottom
+    .domain(rows.map(r => r.gpa))
+    .range([0, height])
     .padding(0.1);
 
-  // Color by age: dark blue, light blue, yellow, dark red
+  // Color by age
   const color = d3.scaleOrdinal()
     .domain(ages)
     .range(["#08306b", "#6baed6", "#ffd92f", "#b30000"]);
 
-  // ---- 4. Axes ----
+  // ---- Axes ----
   const xAxis = d3.axisBottom(x);
   const yAxis = d3.axisLeft(y).tickFormat(d3.format(".3f"));
 
@@ -205,8 +203,17 @@ function drawAgeVsGPA(data) {
     .attr("text-anchor", "middle")
     .text("GPA");
 
-  // ---- Draw stacked horizontal bars ----
+  // ---- Hover text (like "Count per year: X" in example) ----
+  const hoverText = svg.append("text")
+    .attr("id", "age-gpa-hover")
+    .attr("x", width - 10)
+    .attr("y", 300)
+    .attr("text-anchor", "end")
+    .style("font-size", "12px")
+    .style("fill", "#333")
+    .text("Hover over a bar segment");
 
+  // ---- Draw stacked horizontal bars ----
   const rowGroups = svg.selectAll(".gpa-row")
     .data(rows)
     .enter()
@@ -214,20 +221,24 @@ function drawAgeVsGPA(data) {
     .attr("class", "gpa-row")
     .attr("transform", d => `translate(0,${y(d.gpa)})`);
 
+  // For each GPA row, create stacked segments per age
   rowGroups.selectAll("rect")
     .data(d => {
       let acc = 0;
-      // Build segments in a fixed age order
       return ages.map(age => {
         const count = d.counts[age] || 0;
         const start = acc;
         acc += count;
+
         return {
           age: age,
           x0: start,
-          x1: acc
+          x1: acc,
+          count: count,
+          gpa: d.gpa,
+          total: d.total
         };
-      }).filter(seg => seg.x1 > seg.x0);
+      }).filter(seg => seg.count > 0);
     })
     .enter()
     .append("rect")
@@ -235,7 +246,34 @@ function drawAgeVsGPA(data) {
     .attr("y", 0)
     .attr("width", d => x(d.x1) - x(d.x0))
     .attr("height", y.bandwidth())
-    .attr("fill", d => color(d.age));
+    .attr("fill", d => color(d.age))
+    .attr("opacity", 0.9)
+
+    
+    // --- INTERACTIONS: hover like the Betty/Linda example ---
+    .on("mouseover", function (event, seg) {
+      // fade all segments
+      svg.selectAll(".gpa-row rect")
+        .attr("opacity", 0.3)
+        .attr("stroke", "none");
+
+      // highlight the hovered one
+      d3.select(this)
+        .attr("opacity", 1.0)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5);
+
+      hoverText.text(
+        `GPA ~ ${seg.gpa.toFixed(2)}, Age ${seg.age}: ${seg.count} students (of ${seg.total})`
+      );
+    })
+    .on("mouseout", function () {
+      svg.selectAll(".gpa-row rect")
+        .attr("opacity", 0.9)
+        .attr("stroke", "none");
+
+      hoverText.text("Hover over a bar segment");
+    });
 
   // ---- Legend for ages ----
   const legend = svg.append("g")
@@ -256,8 +294,9 @@ function drawAgeVsGPA(data) {
       .text(`Age ${age}`);
   });
 
-  console.log("Age vs GPA drawn (stacked).");
+  console.log("Age vs GPA drawn (stacked with hover interaction).");
 }
+
 
 // Visualization 3: Effect of Parental Education/Support on GPA
 function drawParentalInfluence(data) {
