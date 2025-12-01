@@ -107,8 +107,54 @@ function drawStudyTimeVsGPA(data) {
     .attr("y2", y(linePoints[1].y))
     .attr("stroke", "darkred")
     .attr("stroke-width", 2);
-}
 
+    // AGE FILTER TOGGLE BUTTON
+const AgeToggle = document.getElementById("AgeToggleBtn");
+const ageText = svg.append("text")
+    .attr("x", width - 10)
+    .attr("y", height - 10)
+    .attr("text-anchor", "end")
+    .style("font-size", "12px")
+    .style("fill", "#333")
+    .text("Current Age Filter: None");
+
+// The age cycle order
+const ages = [15, 16, 17, 18, null];
+
+// IMPORTANT: persistent index
+let currentAgeIndex = 0;
+
+AgeToggle.addEventListener("click", () => {
+
+    // Advance to next age each click
+    currentAgeIndex = (currentAgeIndex + 1) % ages.length;
+    const selectedAge = ages[currentAgeIndex];
+
+    // Update label text
+    if (selectedAge !== null) {
+        ageText.text(`Current Age Filter: ${selectedAge}`);
+    } else {
+        ageText.text("Current Age Filter: None");
+    }
+
+    // Filter dataset
+    const filteredData = selectedAge === null
+        ? data
+        : data.filter(d => d.Age === selectedAge);
+
+    // Clear & redraw circles
+    svg.selectAll("circle").remove();
+    svg.selectAll("circle")
+        .data(filteredData)
+        .enter()
+        .append("circle")
+        .attr("cx", d => x(d.GPA))
+        .attr("cy", d => y(d.StudyTimeWeekly))
+        .attr("r", 3)
+        .attr("fill", "steelblue")
+        .attr("opacity", 0.6);
+});
+}
 //  Visualization 2: Age vs GPA (stacked by age, with hover + legend filter)
 function drawAgeVsGPA(data) {
   console.log("Drawing Age vs GPA (stacked by age)");
