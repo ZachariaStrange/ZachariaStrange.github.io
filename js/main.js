@@ -8,6 +8,7 @@ d3.csv("Student_performance_data.csv", d => ({
   Age: +d.Age,
   GPA: +d.GPA,
   Gender: +d.Gender,
+  Tutoring: +d.Tutoring,
   StudyTimeWeekly: +d.StudyTimeWeekly,
   ParentalEducation: +d.ParentalEducation,
   ParentalSupport: +d.ParentalSupport
@@ -28,6 +29,17 @@ d3.select("#genderFilter").on("change", function() {
     updateAllVisualizations(filteredData);
   }
   });
+
+d3.select("#tutorFilter").on("change", function() {
+    if (this.value === "") {
+      selectedTutoring = null;
+      updateAllVisualizations(originalData);
+    } else {
+      selectedTutoring = +this.value; // 0 or 1
+      const filteredData = originalData.filter(d => d.Tutoring === selectedTutoring);
+      updateAllVisualizations(filteredData);
+    }
+    });
 
 });
 
