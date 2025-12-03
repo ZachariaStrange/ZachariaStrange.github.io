@@ -323,12 +323,25 @@ function drawAgeVsGPA(data) {
   const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // ---- Use global age list & color scale so colors stay consistent ----
-  const ages = allAges || Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
+  // 🔹 Ages present in THIS filtered dataset (controls bars & legend contents)
+  const ages = Array.from(new Set(data.map(d => d.Age))).sort(d3.ascending);
+
+  if (!ages.length) {
+    console.warn("No data for Age vs GPA.");
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("text-anchor", "middle")
+      .text("No data for selected filters");
+    return;
+  }
+
+  // 🔹 Color: use global scale so age 17 is ALWAYS yellow, 16 always blue, etc.
   const color = ageColorScale || d3.scaleOrdinal()
     .domain(ages)
     .range(["#08306b", "#6baed6", "#ffd92f", "#b30000"]);
 
+  // ---- Bin GPA and count by age ----
   const gpaBin = d3.bin()
     .domain([0, 4.0])
     .value(d => d.GPA)
@@ -355,8 +368,13 @@ function drawAgeVsGPA(data) {
     };
   }).filter(r => r.total > 0);
 
-  if (rows.length === 0) {
-    console.warn("No data for Age vs GPA.");
+  if (!rows.length) {
+    console.warn("No data rows for Age vs GPA.");
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("text-anchor", "middle")
+      .text("No data for selected filters");
     return;
   }
 
@@ -371,7 +389,6 @@ function drawAgeVsGPA(data) {
     .range([0, height])
     .padding(0.1);
 
-  // Smooth animation
   const t = d3.transition().duration(800);
 
   // ---- Axes ----
@@ -399,7 +416,7 @@ function drawAgeVsGPA(data) {
   const hoverText = svg.append("text")
     .attr("id", "age-gpa-hover")
     .attr("x", width - 10)
-    .attr("y", height - 5)   // bottom-right
+    .attr("y", height - 5)
     .attr("text-anchor", "end")
     .style("font-size", "12px")
     .style("fill", "#333")
@@ -409,6 +426,7 @@ function drawAgeVsGPA(data) {
   let rowGroups;
   let legend;
 
+  // Helper: apply legend filter (called after hover-out, and on legend click)
   function applyAgeFilter() {
     // Update bar segment opacities
     rowGroups.selectAll("rect")
@@ -417,14 +435,16 @@ function drawAgeVsGPA(data) {
         return d.age === selectedAge ? 0.9 : 0.2;
       });
 
-    // Update legend style
-    legend.selectAll("rect.legend-age")
-      .attr("stroke", d => (d === selectedAge ? "black" : "none"))
-      .attr("stroke-width", d => (d === selectedAge ? 2 : 0));
+    if (legend) {
+      // Update legend style
+      legend.selectAll("rect.legend-age")
+        .attr("stroke", d => (d === selectedAge ? "black" : "none"))
+        .attr("stroke-width", d => (d === selectedAge ? 2 : 0));
 
-    legend.selectAll("text.legend-age-label")
-      .style("font-weight", d => (d === selectedAge ? "bold" : "normal"))
-      .style("fill", d => (d === selectedAge ? "#000" : "#444"));
+      legend.selectAll("text.legend-age-label")
+        .style("font-weight", d => (d === selectedAge ? "bold" : "normal"))
+        .style("fill", d => (d === selectedAge ? "#000" : "#444"));
+    }
 
     if (selectedAge === null) {
       hoverText.text("Hover over a bar segment");
@@ -473,10 +493,11 @@ function drawAgeVsGPA(data) {
     .append("rect")
     .attr("x", d => x(d.x0))
     .attr("y", 0)
-    .attr("width", 0)                         // start at 0
+    .attr("width", 0)                         // start at 0 for smooth animation
     .attr("height", y.bandwidth())
-    .attr("fill", d => color(d.age))          // ALWAYS uses global age color
+    .attr("fill", d => color(d.age))          // color from global mapping
     .attr("opacity", 0.9)
+    // Hover interaction
     .on("mouseover", function (event, seg) {
       svg.selectAll(".gpa-row rect")
         .attr("opacity", 0.3)
@@ -496,7 +517,7 @@ function drawAgeVsGPA(data) {
       applyAgeFilter();
     })
     .transition(t)
-    .attr("width", d => x(d.x1) - x(d.x0));   // animate out
+    .attr("width", d => x(d.x1) - x(d.x0));   // animate to full width
 
   // ---- Legend for ages (with click-to-filter) ----
   legend = svg.append("g")
@@ -506,9 +527,9 @@ function drawAgeVsGPA(data) {
     const g = legend.append("g")
       .attr("transform", `translate(0,${i * 18})`)
       .style("cursor", "pointer")
+      // Click: toggle filter for this age, then combine with other filters
       .on("click", () => {
         selectedAge = (selectedAge === age ? null : age);
-
         const filteredData = getCurrentFilteredData();
         updateAllVisualizations(filteredData);
       })
@@ -538,12 +559,14 @@ function drawAgeVsGPA(data) {
       .text(`Age ${age}`);
   });
 
+  // Initial styling (will also bold selectedAge if one is active)
   applyAgeFilter();
 
-  console.log("Age vs GPA drawn (stacked with hover + legend filter + smooth bars + stable colors).");
+  console.log("Age vs GPA drawn (stacked, smooth, stable colors, legend follows filtered ages).");
 
   return svgRoot;
 }
+
 
 
 
