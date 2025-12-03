@@ -9,6 +9,7 @@ d3.csv("Student_performance_data.csv", d => ({
   GPA: +d.GPA,
   Gender: +d.Gender,
   Tutoring: +d.Tutoring,
+  Extracurricular: +d.Extracurricular,
   StudyTimeWeekly: +d.StudyTimeWeekly,
   ParentalEducation: +d.ParentalEducation,
   ParentalSupport: +d.ParentalSupport
@@ -39,9 +40,20 @@ d3.select("#tutorFilter").on("change", function() {
       const filteredData = originalData.filter(d => d.Tutoring === selectedTutoring);
       updateAllVisualizations(filteredData);
     }
-    });
+  });
+d3.select("#extracurricularFilter").on("change", function() {
+      if (this.value === "") {
+        selectedExtracurricular = null;
+        updateAllVisualizations(originalData);
+      } else {
+        selectedExtracurricular = +this.value; // 0 or 1
+        const filteredData = originalData.filter(d => d.Extracurricular === selectedExtracurricular);
+        updateAllVisualizations(filteredData);
+      }
 
+    })
 });
+
 
 
 function updateAllVisualizations(filteredData) {
