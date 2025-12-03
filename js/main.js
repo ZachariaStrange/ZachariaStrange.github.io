@@ -1,9 +1,13 @@
 let originalData = null;
 let selectedAge = null;
+let selectedGender = null;
+let selectedExtracurricular = null;
+let selectedTutoring = null;
 
 d3.csv("Student_performance_data.csv", d => ({
   Age: +d.Age,
   GPA: +d.GPA,
+  Gender: +d.Gender,
   StudyTimeWeekly: +d.StudyTimeWeekly,
   ParentalEducation: +d.ParentalEducation,
   ParentalSupport: +d.ParentalSupport
@@ -12,7 +16,21 @@ d3.csv("Student_performance_data.csv", d => ({
   drawStudyTimeVsGPA(data);
   drawAgeVsGPA(data);
   drawParentalInfluence(data);
+
+  //Implementing gender filter?
+d3.select("#genderFilter").on("change", function() {
+  if (this.value === "") {
+    selectedGender = null;
+    updateAllVisualizations(originalData);
+  } else {
+    selectedGender = +this.value; // 0 or 1
+    const filteredData = originalData.filter(d => d.Gender === selectedGender);
+    updateAllVisualizations(filteredData);
+  }
+  });
+
 });
+
 
 function updateAllVisualizations(filteredData) {
   d3.select("#vis-studytime-gpa").selectAll("*").remove();
