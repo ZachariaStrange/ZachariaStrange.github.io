@@ -16,6 +16,9 @@ let studyInitialized = false;
 let allAges = null;
 let ageColorScale = null;
 
+let studyTooltip = null;
+
+
 
 function getCurrentFilteredData() {
   if (!originalData) return [];
@@ -128,11 +131,27 @@ function updateAllVisualizations(filteredData) {
 
 
 
-// Visualization 1: Study Time vs GPA (Scatter with trend line)
 function drawStudyTimeVsGPA(data) {
   const margin = { top: 20, right: 20, bottom: 50, left: 60 };
   const width = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
+
+  // ----- CREATE / REUSE TOOLTIP DIV -----
+  if (!studyTooltip) {
+    studyTooltip = d3.select("body")
+      .append("div")
+      .attr("id", "study-tooltip")
+      .style("position", "absolute")
+      .style("pointer-events", "none")
+      .style("background", "white")
+      .style("border", "1px solid #999")
+      .style("border-radius", "4px")
+      .style("padding", "6px 8px")
+      .style("font-size", "12px")
+      .style("color", "#333")
+      .style("box-shadow", "0 2px 6px rgba(0,0,0,0.15)")
+      .style("opacity", 0);
+  }
 
   // ----- SETUP / REUSE SVG + GROUP -----
   let svgRoot = d3.select("#vis-studytime-gpa").select("svg");
@@ -198,8 +217,8 @@ function drawStudyTimeVsGPA(data) {
     .transition(t)
     .call(d3.axisLeft(y));
 
-  // ----- POINTS (data join + transitions) -----
-  const circles = svg.selectAll("circle")
+  // ----- POINTS (data join + transitions + tooltip) -----
+  const circles = svg.selectAll("circle.study-point")
     .data(data, (d, i) => i);  // index key is fine here
 
   // Exit: shrink then remove
@@ -208,22 +227,71 @@ function drawStudyTimeVsGPA(data) {
     .attr("r", 0)
     .remove();
 
-  // Update existing
+  // UPDATE existing circles
   circles
     .transition(t)
     .attr("cx", d => x(d.GPA))
     .attr("cy", d => y(d.StudyTimeWeekly));
 
-  // Enter: grow from r=0
-  circles.enter()
+  // ENTER new circles
+  const circlesEnter = circles.enter()
     .append("circle")
+    .attr("class", "study-point")
     .attr("cx", d => x(d.GPA))
     .attr("cy", d => y(d.StudyTimeWeekly))
     .attr("r", 0)
     .attr("fill", "steelblue")
-    .attr("opacity", 0.6)
+    .attr("opacity", 0.6);
+
+  // MERGE for shared event handlers
+  const allCircles = circlesEnter.merge(circles);
+
+  allCircles
+    .on("mouseover", function (event, d) {
+      d3.select(this)
+        .attr("r", 6)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5);
+
+      studyTooltip
+        .style("opacity", 1)
+        .html(
+          `Study Time: ${d.StudyTimeWeekly.toFixed(1)} hours<br>` +
+          `GPA: ${d.GPA.toFixed(2)}`
+        );
+    })
+    .on("mousemove", function (event, d) {
+      // Position tooltip slightly offset from cursor
+      studyTooltip
+        .style("left", (event.pageX + 12) + "px")
+        .style("top", (event.pageY - 28) + "px");
+    })
+    .on("mouseout", function () {
+      d3.select(this)
+        .attr("r", 3)
+        .attr("stroke", "none");
+
+      studyTooltip
+        .style("opacity", 0);
+    })
+    .on("click", function (event, d) {
+      // Clicking also shows / updates tooltip (in case you click without hovering)
+      d3.select(this)
+        .attr("r", 6)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5);
+
+      studyTooltip
+        .style("opacity", 1)
+        .style("left", (event.pageX + 12) + "px")
+        .style("top", (event.pageY - 28) + "px")
+        .html(
+          `Study Time: ${d.StudyTimeWeekly.toFixed(1)} hours<br>` +
+          `GPA: ${d.GPA.toFixed(2)}`
+        );
+    })
     .transition(t)
-    .attr("r", 3);
+    .attr("r", 3);  // default radius after animation
 
   // ----- TREND LINE (smoothly move endpoints) -----
   if (data.length > 1) {
@@ -270,6 +338,7 @@ function drawStudyTimeVsGPA(data) {
 
   return svgRoot;
 }
+
 
 
 
