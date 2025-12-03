@@ -17,7 +17,8 @@ let allAges = null;
 let ageColorScale = null;
 
 let studyTooltip = null;
-
+let ageTooltip = null;      // for graph 2
+let parentalTooltip = null; // for graph 3
 
 
 function getCurrentFilteredData() {
@@ -376,7 +377,7 @@ function drawStudyTimeVsGPA(data) {
 
 
 
-//  Visualization 2: Age vs GPA (stacked by age, with hover + legend filter + smooth scaling)
+//  Visualization 2: Age vs GPA (stacked by age, with hover + legend filter + smooth scaling + tooltip)
 function drawAgeVsGPA(data) {
   console.log("Drawing Age vs GPA (stacked by age)");
 
@@ -385,6 +386,23 @@ function drawAgeVsGPA(data) {
   const height = 400 - margin.top - margin.bottom;
   const outerWidth  = width  + margin.left + margin.right;
   const outerHeight = height + margin.top  + margin.bottom;
+
+  // --- CREATE / REUSE HTML TOOLTIP FOR GRAPH 2 ---
+  if (!ageTooltip) {
+    ageTooltip = d3.select("body")
+      .append("div")
+      .attr("id", "age-tooltip")
+      .style("position", "absolute")
+      .style("pointer-events", "none")
+      .style("background", "white")
+      .style("border", "1px solid #999")
+      .style("border-radius", "4px")
+      .style("padding", "6px 8px")
+      .style("font-size", "12px")
+      .style("color", "#333")
+      .style("box-shadow", "0 2px 6px rgba(0,0,0,0.15)")
+      .style("opacity", 0);
+  }
 
   // --- Reuse / create SVG & core groups once ---
   let svgRoot = d3.select("#vis-age-gpa").select("svg");
@@ -424,7 +442,7 @@ function drawAgeVsGPA(data) {
       .attr("text-anchor", "middle")
       .text("GPA");
 
-    // Hover text (once)
+    // Hover text (once) – keep for age summary when an age is selected
     hoverText = svg.append("text")
       .attr("id", "age-gpa-hover")
       .attr("x", width - 10)
@@ -432,8 +450,7 @@ function drawAgeVsGPA(data) {
       .attr("text-anchor", "end")
       .style("font-size", "12px")
       .style("fill", "#333")
-      .text("Hover over a bar segment");
-
+      .text(""); // no "hover over a bar" text anymore
     // Legend group (once)
     legend = svg.append("g")
       .attr("class", "age-legend")
@@ -443,11 +460,11 @@ function drawAgeVsGPA(data) {
       .attr("width",  outerWidth)
       .attr("height", outerHeight);
 
-    svg      = svgRoot.select("g.age-chart-root");
-    xAxisG   = svg.select(".x-axis");
-    yAxisG   = svg.select(".y-axis");
+    svg       = svgRoot.select("g.age-chart-root");
+    xAxisG    = svg.select(".x-axis");
+    yAxisG    = svg.select(".y-axis");
     hoverText = svg.select("#age-gpa-hover");
-    legend   = svg.select("g.age-legend");
+    legend    = svg.select("g.age-legend");
   }
 
   // --- Ages present in THIS filtered data (controls bars & legend content) ---
@@ -594,7 +611,7 @@ function drawAgeVsGPA(data) {
 
   rects
     .on("mouseover", function (event, seg) {
-      // Fade others
+      // fade others
       svg.selectAll(".gpa-row rect")
         .attr("opacity", 0.3)
         .attr("stroke", "none");
@@ -604,13 +621,27 @@ function drawAgeVsGPA(data) {
         .attr("stroke", "black")
         .attr("stroke-width", 1.5);
 
-      hoverText.text(
-        `GPA ~ ${seg.gpa.toFixed(2)}, Age ${seg.age}: ${seg.count} students (of ${seg.total})`
-      );
+      // show tooltip instead of using hoverText
+      ageTooltip
+        .style("opacity", 1)
+        .html(
+          `GPA ~ ${seg.gpa.toFixed(2)}<br>` +
+          `Age ${seg.age}: ${seg.count} students (of ${seg.total})`
+        );
+    })
+    .on("mousemove", function (event, seg) {
+      ageTooltip
+        .style("left", (event.pageX + 12) + "px")
+        .style("top", (event.pageY - 28) + "px");
     })
     .on("mouseout", function () {
       svg.selectAll(".gpa-row rect").attr("stroke", "none");
-      applyAgeFilter();  // restore filter state
+
+      // hide tooltip
+      ageTooltip.style("opacity", 0);
+
+      // restore filter state
+      applyAgeFilter();
     })
     .transition(t)
     .attr("width", d => x(d.x1) - x(d.x0)); // animate to new width
@@ -681,9 +712,9 @@ function drawAgeVsGPA(data) {
       .style("font-weight", d => (d === selectedAge ? "bold" : "normal"))
       .style("fill", d => (d === selectedAge ? "#000" : "#444"));
 
-    // Hover text summary
+    // Hover text summary (only for selected age – no "hover over" msg)
     if (selectedAge === null) {
-      hoverText.text("Hover over a bar segment");
+      hoverText.text("");
     } else {
       const ageData = data.filter(d => d.Age === selectedAge);
       const totalStudents = ageData.length;
@@ -702,7 +733,7 @@ function drawAgeVsGPA(data) {
   // Initial styling for current filter state
   applyAgeFilter();
 
-  console.log("Age vs GPA drawn (stacked, smooth scaling, stable colors, filtered legend).");
+  console.log("Age vs GPA drawn (stacked, smooth scaling, stable colors, filtered legend, tooltip).");
 }
 
 
@@ -750,23 +781,31 @@ function drawAgeVsGPA(data) {
 
 
 
-// Visualization 3: Effect of Parental Education/Support on GPA (with legend series toggle)
+
+// Visualization 3: Effect of Parental Education/Support on GPA (with legend series toggle + tooltip)
 function drawParentalInfluence(data) {
   console.log("Drawing Effect of Parental Education/Support on GPA");
 
   const margin = { top: 20, right: 60, bottom: 50, left: 60 };
   const width  = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
-/*
-  const svg = d3.select("#vis-parental-gpa")
-    .append("svg")
-    .attr("width",  width  + margin.left + margin.right)
-    .attr("height", height + margin.top  + margin.bottom)
-    .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
-*/
 
-
+  // --- CREATE / REUSE HTML TOOLTIP FOR GRAPH 3 ---
+  if (!parentalTooltip) {
+    parentalTooltip = d3.select("body")
+      .append("div")
+      .attr("id", "parental-tooltip")
+      .style("position", "absolute")
+      .style("pointer-events", "none")
+      .style("background", "white")
+      .style("border", "1px solid #999")
+      .style("border-radius", "4px")
+      .style("padding", "6px 8px")
+      .style("font-size", "12px")
+      .style("color", "#333")
+      .style("box-shadow", "0 2px 6px rgba(0,0,0,0.15)")
+      .style("opacity", 0);
+  }
 
   const svgRoot = d3.select("#vis-parental-gpa")
     .append("svg")
@@ -869,7 +908,7 @@ function drawParentalInfluence(data) {
     .text("Parental Support");
 
   // ---------------------------------
-  // Hover text
+  // Hover text (kept only for generic instructions, no per-bar text)
   // ---------------------------------
   const hoverText = svg.append("text")
     .attr("id", "parental-hover-text")
@@ -878,7 +917,7 @@ function drawParentalInfluence(data) {
     .attr("text-anchor", "end")
     .style("font-size", "12px")
     .style("fill", "#333")
-    .text("Hover over a bar");
+    .text(""); // no "Hover over a bar" text here
 
   // ---------------------------------
   // Bars
@@ -899,14 +938,24 @@ function drawParentalInfluence(data) {
         .attr("stroke", "black")
         .attr("stroke-width", 1.5);
 
-      hoverText.text(
-        `GPA ~ ${d.center.toFixed(2)} | Education: ${d.eduSum.toFixed(1)}, Support: ${d.supSum.toFixed(1)}`
-      );
+      parentalTooltip
+        .style("opacity", 1)
+        .html(
+          `GPA ~ ${d.center.toFixed(2)}<br>` +
+          `Education: ${d.eduSum.toFixed(1)}<br>` +
+          `Support: ${d.supSum.toFixed(1)}`
+        );
+    })
+    .on("mousemove", function (event, d) {
+      parentalTooltip
+        .style("left", (event.pageX + 12) + "px")
+        .style("top", (event.pageY - 28) + "px");
     })
     .on("mouseout", function () {
       d3.select(this).attr("stroke", "none");
+      parentalTooltip.style("opacity", 0);
       if (selectedSeries === null) {
-        hoverText.text("Hover over a bar");
+        hoverText.text("");
       }
     });
 
@@ -926,14 +975,24 @@ function drawParentalInfluence(data) {
         .attr("stroke", "black")
         .attr("stroke-width", 1.5);
 
-      hoverText.text(
-        `GPA ~ ${d.center.toFixed(2)} | Support: ${d.supSum.toFixed(1)}, Education: ${d.eduSum.toFixed(1)}`
-      );
+      parentalTooltip
+        .style("opacity", 1)
+        .html(
+          `GPA ~ ${d.center.toFixed(2)}<br>` +
+          `Support: ${d.supSum.toFixed(1)}<br>` +
+          `Education: ${d.eduSum.toFixed(1)}`
+        );
+    })
+    .on("mousemove", function (event, d) {
+      parentalTooltip
+        .style("left", (event.pageX + 12) + "px")
+        .style("top", (event.pageY - 28) + "px");
     })
     .on("mouseout", function () {
       d3.select(this).attr("stroke", "none");
+      parentalTooltip.style("opacity", 0);
       if (selectedSeries === null) {
-        hoverText.text("Hover over a bar");
+        hoverText.text("");
       }
     });
 
@@ -949,7 +1008,6 @@ function drawParentalInfluence(data) {
 
   function applySeriesFilter() {
     if (selectedSeries === null) {
-      // show both series & both axes
       eduBars.attr("opacity", 0.9);
       supBars.attr("opacity", 0.9);
 
@@ -958,9 +1016,8 @@ function drawParentalInfluence(data) {
       eduLabel.style("display", null);
       supLabel.style("display", null);
 
-      hoverText.text("Hover over a bar");
+      hoverText.text("");
     } else if (selectedSeries === "edu") {
-      // only education visible
       eduBars.attr("opacity", 0.9);
       supBars.attr("opacity", 0.0);
 
@@ -970,7 +1027,6 @@ function drawParentalInfluence(data) {
       supLabel.style("display", "none");
 
     } else if (selectedSeries === "sup") {
-      // only support visible
       eduBars.attr("opacity", 0.0);
       supBars.attr("opacity", 0.9);
 
@@ -978,10 +1034,8 @@ function drawParentalInfluence(data) {
       yRightAxisG.style("display", null);
       eduLabel.style("display", "none");
       supLabel.style("display", null);
-
     }
 
-    // Update legend styling
     legendItems.select("rect.legend-swatch")
       .attr("stroke", d => (selectedSeries === d.key ? "black" : "none"))
       .attr("stroke-width", d => (selectedSeries === d.key ? 2 : 0));
@@ -1001,16 +1055,14 @@ function drawParentalInfluence(data) {
     .attr("class", "legend-item")
     .attr("transform", (d, i) => `translate(0, ${i * 20})`)
     .style("cursor", "pointer")
-    // Click: toggle which series is shown
     .on("click", (event, d) => {
       if (selectedSeries === d.key) {
-        selectedSeries = null;   // turn filter off, show both
+        selectedSeries = null;
       } else {
-        selectedSeries = d.key;  // show only this series
+        selectedSeries = d.key;
       }
       applySeriesFilter();
     })
-    // Hover: highlight ONLY this legend item (no graph change)
     .on("mouseover", function () {
       d3.select(this).select("rect.legend-swatch")
         .attr("stroke", "black")
@@ -1021,7 +1073,6 @@ function drawParentalInfluence(data) {
         .style("fill", "#000");
     })
     .on("mouseout", function () {
-      // restore styling to match selectedSeries
       applySeriesFilter();
     });
 
@@ -1037,10 +1088,9 @@ function drawParentalInfluence(data) {
     .attr("y", 11)
     .text(d => d.label);
 
-  // initial state: show both series
   applySeriesFilter();
 
-  console.log("Effect of Parental Education/Support on GPA drawn (with legend series toggle).");
+  console.log("Effect of Parental Education/Support on GPA drawn (with legend series toggle + tooltip).");
 
   return svgRoot;
 }
