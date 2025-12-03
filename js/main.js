@@ -312,48 +312,78 @@ function drawStudyTimeVsGPA(data) {
     .transition(t)
     .attr("r", 3);  // default radius after animation
 
-  // ----- TREND LINE (smoothly move endpoints) -----
-  if (data.length > 1) {
-    const xMean = d3.mean(data, d => d.GPA);
-    const yMean = d3.mean(data, d => d.StudyTimeWeekly);
+   // ----- TREND LINE (smoothly move endpoints + tooltip) -----
+  // ----- TREND LINE (smoothly move endpoints + tooltip for equation) -----
+if (data.length > 1) {
+  const xMean = d3.mean(data, d => d.GPA);
+  const yMean = d3.mean(data, d => d.StudyTimeWeekly);
 
-    let num = 0, den = 0;
-    data.forEach(d => {
-      const xDev = d.GPA - xMean;
-      const yDev = d.StudyTimeWeekly - yMean;
-      num += xDev * yDev;
-      den += xDev * xDev;
+  let num = 0, den = 0;
+  data.forEach(d => {
+    const xDev = d.GPA - xMean;
+    const yDev = d.StudyTimeWeekly - yMean;
+    num += xDev * yDev;
+    den += xDev * xDev;
+  });
+
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = yMean - slope * xMean;
+
+  const xVals = [-0.2, 4.2];
+  const linePoints = xVals.map(xv => ({
+    x: xv,
+    y: slope * xv + intercept
+  }));
+
+  let line = svg.select("line.trend-line");
+  if (line.empty()) {
+    line = svg.append("line")
+      .attr("class", "trend-line")
+      .attr("stroke", "darkred")
+      .attr("stroke-width", 2);
+  }
+
+  line.transition(t)
+    .attr("x1", x(linePoints[0].x))
+    .attr("y1", y(linePoints[0].y))
+    .attr("x2", x(linePoints[1].x))
+    .attr("y2", y(linePoints[1].y));
+
+  // ===== TOOLTIP FOR TREND LINE EQUATION =====
+  // Build a nice y = m x + b string
+  const m  = slope;
+  const b  = intercept;
+  const bAbs = Math.abs(b).toFixed(2);
+  const bStr = b >= 0 ? ` + ${bAbs}` : ` - ${bAbs}`;
+
+  const eqHtml = `
+    <strong>Trend Line</strong><br>
+    Study Time = ${m.toFixed(2)}(GPA)${bStr} hours
+  `;
+
+  line
+    .style("cursor", "pointer")
+    .on("mouseover", (event) => {
+      studyTooltip
+        .style("opacity", 1)
+        .html(eqHtml);
+    })
+    .on("mousemove", (event) => {
+      const [px, py] = d3.pointer(event, document.body);
+      studyTooltip
+        .style("left", px + 15 + "px")
+        .style("top",  py + 15 + "px");
+    })
+    .on("mouseout", () => {
+      studyTooltip.style("opacity", 0);
     });
 
-    const slope = den === 0 ? 0 : num / den;
-    const intercept = yMean - slope * xMean;
+} else {
+  svg.select("line.trend-line")
+    .transition(t)
+    .attr("stroke-width", 0);
+}
 
-    const xVals = [-0.2, 4.2];
-    const linePoints = xVals.map(xv => ({
-      x: xv,
-      y: slope * xv + intercept
-    }));
-
-    let line = svg.select("line.trend-line");
-    if (line.empty()) {
-      line = svg.append("line")
-        .attr("class", "trend-line")
-        .attr("stroke", "darkred")
-        .attr("stroke-width", 2);
-    }
-
-    line.transition(t)
-      .attr("x1", x(linePoints[0].x))
-      .attr("y1", y(linePoints[0].y))
-      .attr("x2", x(linePoints[1].x))
-      .attr("y2", y(linePoints[1].y))
-      .attr("stroke-width", 2);
-  } else {
-    // Not enough points -> hide line
-    svg.select("line.trend-line")
-      .transition(t)
-      .attr("stroke-width", 0);
-  }
 
   return svgRoot;
 }
