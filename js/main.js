@@ -782,13 +782,16 @@ function drawAgeVsGPA(data) {
 
 
 
-// Visualization 3: Effect of Parental Education/Support on GPA (with legend series toggle + tooltip)
+// Visualization 3: Effect of Parental Education/Support on GPA
+// (smooth animations + legend series toggle + tooltip)
 function drawParentalInfluence(data) {
   console.log("Drawing Effect of Parental Education/Support on GPA");
 
   const margin = { top: 20, right: 60, bottom: 50, left: 60 };
   const width  = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
+  const outerWidth  = width  + margin.left + margin.right;
+  const outerHeight = height + margin.top  + margin.bottom;
 
   // --- CREATE / REUSE HTML TOOLTIP FOR GRAPH 3 ---
   if (!parentalTooltip) {
@@ -807,13 +810,84 @@ function drawParentalInfluence(data) {
       .style("opacity", 0);
   }
 
-  const svgRoot = d3.select("#vis-parental-gpa")
-    .append("svg")
-    .attr("width",  width  + margin.left + margin.right)
-    .attr("height", height + margin.top  + margin.bottom);
+  // --- REUSE / CREATE SVG + CORE GROUPS ---
+  let svgRoot = d3.select("#vis-parental-gpa").select("svg");
+  let svg, xAxisG, yLeftAxisG, yRightAxisG, hoverText, legend, eduLabel, supLabel;
 
-  const svg = svgRoot.append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
+  if (svgRoot.empty()) {
+    svgRoot = d3.select("#vis-parental-gpa")
+      .append("svg")
+      .attr("width",  outerWidth)
+      .attr("height", outerHeight);
+
+    svg = svgRoot.append("g")
+      .attr("class", "parental-chart-root")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Axes groups
+    xAxisG = svg.append("g")
+      .attr("class", "x-axis")
+      .attr("transform", `translate(0,${height})`);
+
+    yLeftAxisG = svg.append("g")
+      .attr("class", "y-axis-left");
+
+    yRightAxisG = svg.append("g")
+      .attr("class", "y-axis-right")
+      .attr("transform", `translate(${width},0)`);
+
+    // Axis labels
+    svg.append("text")
+      .attr("class", "x-label")
+      .attr("x", width / 2)
+      .attr("y", height + 40)
+      .attr("text-anchor", "middle")
+      .text("GPA");
+
+    eduLabel = svg.append("text")
+      .attr("class", "label-edu")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -45)
+      .attr("text-anchor", "middle")
+      .text("Parental Education");
+
+    supLabel = svg.append("text")
+      .attr("class", "label-sup")
+      .attr("transform", "rotate(90)")
+      .attr("x", height / 2)
+      .attr("y", -width - 45)
+      .attr("text-anchor", "middle")
+      .text("Parental Support");
+
+    // Hover text (just for generic info, not per-bar)
+    hoverText = svg.append("text")
+      .attr("id", "parental-hover-text")
+      .attr("x", width - 10)
+      .attr("y", -2)
+      .attr("text-anchor", "end")
+      .style("font-size", "12px")
+      .style("fill", "#333")
+      .text("");
+
+    // Legend container
+    legend = svg.append("g")
+      .attr("class", "parental-legend")
+      .attr("transform", `translate(${width - 160}, 10)`);
+  } else {
+    svgRoot
+      .attr("width",  outerWidth)
+      .attr("height", outerHeight);
+
+    svg          = svgRoot.select("g.parental-chart-root");
+    xAxisG       = svg.select(".x-axis");
+    yLeftAxisG   = svg.select(".y-axis-left");
+    yRightAxisG  = svg.select(".y-axis-right");
+    hoverText    = svg.select("#parental-hover-text");
+    legend       = svg.select("g.parental-legend");
+    eduLabel     = svg.select(".label-edu");
+    supLabel     = svg.select(".label-sup");
+  }
 
   // ---------------------------------
   // GPA binning
@@ -836,6 +910,9 @@ function drawParentalInfluence(data) {
 
   if (!rows.length) {
     console.warn("No data for Parental Influence.");
+    svg.selectAll(".bar-education, .bar-support").remove();
+    legend.selectAll(".legend-item").remove();
+    hoverText.text("No data for selected filters");
     return;
   }
 
@@ -858,81 +935,58 @@ function drawParentalInfluence(data) {
     .domain([0, 200])
     .range([height, 0]);
 
-  // ---------------------------------
-  // Axes (keep references so we can hide/show)
-  // ---------------------------------
-  const xAxisG = svg.append("g")
-    .attr("transform", `translate(0,${height})`)
-    .call(
-      d3.axisBottom(x)
-        .tickValues(d3.range(0, 4.5, 0.5))
-        .tickFormat(d3.format(".1f"))
-    );
+  const t = d3.transition().duration(800);
 
-  const yLeftAxisG = svg.append("g")
-    .attr("class", "y-axis-left")
-    .call(
-      d3.axisLeft(yLeft)
-        .tickValues([0, 20, 40, 60, 80, 100, 120, 140, 160])
-    );
 
-  const yRightAxisG = svg.append("g")
-    .attr("class", "y-axis-right")
-    .attr("transform", `translate(${width},0)`)
-    .call(
-      d3.axisRight(yRight)
-        .tickValues([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200])
-    );
+// ---------------------------------
+// Axes (no animation on margins)
+// ---------------------------------
+xAxisG
+  .call(
+    d3.axisBottom(x)
+      .tickValues(d3.range(0, 4.5, 0.5))
+      .tickFormat(d3.format(".1f"))
+  );
 
-  // Axis labels
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", height + 40)
-    .attr("text-anchor", "middle")
-    .text("GPA");
+yLeftAxisG
+  .call(
+    d3.axisLeft(yLeft)
+      .tickValues([0, 20, 40, 60, 80, 100, 120, 140, 160])
+  );
 
-  const eduLabel = svg.append("text")
-    .attr("class", "label-edu")
-    .attr("transform", "rotate(-90)")
-    .attr("x", -height / 2)
-    .attr("y", -45)
-    .attr("text-anchor", "middle")
-    .text("Parental Education");
-
-  const supLabel = svg.append("text")
-    .attr("class", "label-sup")
-    .attr("transform", "rotate(90)")
-    .attr("x", height / 2)
-    .attr("y", -width - 45)
-    .attr("text-anchor", "middle")
-    .text("Parental Support");
+yRightAxisG
+  .call(
+    d3.axisRight(yRight)
+      .tickValues([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200])
+  );
 
   // ---------------------------------
-  // Hover text (kept only for generic instructions, no per-bar text)
+  // Bars (smoothly animate)
   // ---------------------------------
-  const hoverText = svg.append("text")
-    .attr("id", "parental-hover-text")
-    .attr("x", width - 10)
-    .attr("y", -2)
-    .attr("text-anchor", "end")
-    .style("font-size", "12px")
-    .style("fill", "#333")
-    .text(""); // no "Hover over a bar" text here
 
-  // ---------------------------------
-  // Bars
-  // ---------------------------------
-  const eduBars = svg.selectAll(".bar-education")
-    .data(rows)
-    .enter()
+  // Education bars
+  let eduBars = svg.selectAll(".bar-education")
+    .data(rows, d => d.center);
+
+  eduBars.exit()
+    .transition(t)
+    .attr("y", height)
+    .attr("height", 0)
+    .remove();
+
+  const eduEnter = eduBars.enter()
     .append("rect")
     .attr("class", "bar-education")
     .attr("x", d => x(d.center) - eduBarWidth)
-    .attr("y", d => yLeft(Math.min(d.eduSum, 160)))
+    .attr("y", height)           // start at bottom
     .attr("width", eduBarWidth * 2)
-    .attr("height", d => height - yLeft(Math.min(d.eduSum, 160)))
+    .attr("height", 0)           // start at zero height
     .attr("fill", "#1f77b4")
-    .attr("opacity", 0.9)
+    .attr("opacity", 0.9);
+
+  eduBars = eduEnter.merge(eduBars);
+
+  eduBars
     .on("mouseover", function (event, d) {
       d3.select(this)
         .attr("stroke", "black")
@@ -957,19 +1011,35 @@ function drawParentalInfluence(data) {
       if (selectedSeries === null) {
         hoverText.text("");
       }
-    });
+    })
+    .transition(t)
+    .attr("x", d => x(d.center) - eduBarWidth)
+    .attr("y", d => yLeft(Math.min(d.eduSum, 160)))
+    .attr("height", d => height - yLeft(Math.min(d.eduSum, 160)));
 
-  const supBars = svg.selectAll(".bar-support")
-    .data(rows)
-    .enter()
+  // Support bars
+  let supBars = svg.selectAll(".bar-support")
+    .data(rows, d => d.center);
+
+  supBars.exit()
+    .transition(t)
+    .attr("y", height)
+    .attr("height", 0)
+    .remove();
+
+  const supEnter = supBars.enter()
     .append("rect")
     .attr("class", "bar-support")
     .attr("x", d => x(d.center) - supBarWidth / 2)
-    .attr("y", d => yRight(Math.min(d.supSum, 200)))
+    .attr("y", height)
     .attr("width", supBarWidth)
-    .attr("height", d => height - yRight(Math.min(d.supSum, 200)))
+    .attr("height", 0)
     .attr("fill", "#ff7f00")
-    .attr("opacity", 0.9)
+    .attr("opacity", 0.9);
+
+  supBars = supEnter.merge(supBars);
+
+  supBars
     .on("mouseover", function (event, d) {
       d3.select(this)
         .attr("stroke", "black")
@@ -994,10 +1064,14 @@ function drawParentalInfluence(data) {
       if (selectedSeries === null) {
         hoverText.text("");
       }
-    });
+    })
+    .transition(t)
+    .attr("x", d => x(d.center) - supBarWidth / 2)
+    .attr("y", d => yRight(Math.min(d.supSum, 200)))
+    .attr("height", d => height - yRight(Math.min(d.supSum, 200)));
 
   // ---------------------------------
-  // Legend + series toggle
+  // Legend + series toggle (reused if present)
   // ---------------------------------
   const legendData = [
     { key: "edu", label: "Parental Education", color: "#1f77b4" },
@@ -1005,6 +1079,51 @@ function drawParentalInfluence(data) {
   ];
 
   let selectedSeries = null; // null = both; "edu" or "sup"
+
+  let legendItems = legend.selectAll(".legend-item")
+    .data(legendData, d => d.key);
+
+  legendItems.exit().remove();
+
+  const legendEnter = legendItems.enter()
+    .append("g")
+    .attr("class", "legend-item")
+    .style("cursor", "pointer")
+    .on("click", (event, d) => {
+      if (selectedSeries === d.key) {
+        selectedSeries = null;
+      } else {
+        selectedSeries = d.key;
+      }
+      applySeriesFilter();
+    })
+    .on("mouseover", function () {
+      d3.select(this).select("rect.legend-swatch")
+        .attr("stroke", "black")
+        .attr("stroke-width", 2);
+
+      d3.select(this).select("text.legend-label")
+        .style("font-weight", "bold")
+        .style("fill", "#000");
+    })
+    .on("mouseout", function () {
+      applySeriesFilter();
+    });
+
+  legendEnter.append("rect")
+    .attr("class", "legend-swatch")
+    .attr("width", 14)
+    .attr("height", 14)
+    .attr("fill", d => d.color);
+
+  legendEnter.append("text")
+    .attr("class", "legend-label")
+    .attr("x", 20)
+    .attr("y", 11)
+    .text(d => d.label);
+
+  legendItems = legendEnter.merge(legendItems);
+  legendItems.attr("transform", (d, i) => `translate(0, ${i * 20})`);
 
   function applySeriesFilter() {
     if (selectedSeries === null) {
@@ -1045,52 +1164,11 @@ function drawParentalInfluence(data) {
       .style("fill", d => (selectedSeries === d.key ? "#000" : "#444"));
   }
 
-  const legend = svg.append("g")
-    .attr("transform", `translate(${width - 160}, 10)`);
-
-  const legendItems = legend.selectAll(".legend-item")
-    .data(legendData)
-    .enter()
-    .append("g")
-    .attr("class", "legend-item")
-    .attr("transform", (d, i) => `translate(0, ${i * 20})`)
-    .style("cursor", "pointer")
-    .on("click", (event, d) => {
-      if (selectedSeries === d.key) {
-        selectedSeries = null;
-      } else {
-        selectedSeries = d.key;
-      }
-      applySeriesFilter();
-    })
-    .on("mouseover", function () {
-      d3.select(this).select("rect.legend-swatch")
-        .attr("stroke", "black")
-        .attr("stroke-width", 2);
-
-      d3.select(this).select("text.legend-label")
-        .style("font-weight", "bold")
-        .style("fill", "#000");
-    })
-    .on("mouseout", function () {
-      applySeriesFilter();
-    });
-
-  legendItems.append("rect")
-    .attr("class", "legend-swatch")
-    .attr("width", 14)
-    .attr("height", 14)
-    .attr("fill", d => d.color);
-
-  legendItems.append("text")
-    .attr("class", "legend-label")
-    .attr("x", 20)
-    .attr("y", 11)
-    .text(d => d.label);
-
+  // initial state: show both series
   applySeriesFilter();
 
-  console.log("Effect of Parental Education/Support on GPA drawn (with legend series toggle + tooltip).");
+  console.log("Effect of Parental Education/Support on GPA drawn (smooth, tooltip, legend toggle).");
 
   return svgRoot;
 }
+
