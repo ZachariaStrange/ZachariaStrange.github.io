@@ -219,7 +219,6 @@ function drawAgeVsGPA(data) {
     .text("Hover over a bar segment");
 
   // ---- State for legend filter ----
-  //let selectedAge = null; // null = no filter  {OLD - moved to global}
 
   // We'll define these variables so helper functions can see them
   let rowGroups;
