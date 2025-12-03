@@ -83,6 +83,24 @@ d3.csv("Student_performance_data.csv", d => ({
     }
     updateAllVisualizations(getCurrentFilteredData());
   });
+
+    // --- RESET ALL FILTERS button ---
+  d3.select("#resetFilters").on("click", function() {
+    // Reset all globals
+    selectedAge = null;
+    selectedGender = null;
+    selectedTutoring = null;
+    selectedExtracurricular = null;
+
+    // Reset dropdown UI values
+    d3.select("#genderFilter").property("value", "");
+    d3.select("#tutorFilter").property("value", "");
+    d3.select("#extracurricularFilter").property("value", "");
+
+    // Redraw everything with full, unfiltered data
+    updateAllVisualizations(getCurrentFilteredData());
+  });
+
 });
 
 
