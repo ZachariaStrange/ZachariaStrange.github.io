@@ -4,6 +4,14 @@ let selectedGender = null;
 let selectedExtracurricular = null;
 let selectedTutoring = null;
 
+// Globals for smooth animation of StudyTime vs GPA
+let studySvg = null;
+let studyGroup = null;
+let studyXScale = null;
+let studyYScale = null;
+let studyTrendLine = null;
+let studyInitialized = false;
+
 d3.csv("Student_performance_data.csv", d => ({
   Age: +d.Age,
   GPA: +d.GPA,
@@ -15,9 +23,10 @@ d3.csv("Student_performance_data.csv", d => ({
   ParentalSupport: +d.ParentalSupport
 })).then(data => {
   originalData = data;
-  drawStudyTimeVsGPA(data);
-  drawAgeVsGPA(data);
-  drawParentalInfluence(data);
+  updateAllVisualizations(originalData);
+  //drawStudyTimeVsGPA(data);
+ // drawAgeVsGPA(data);
+ // drawParentalInfluence(data);
 
   //Implementing gender filter?
 d3.select("#genderFilter").on("change", function() {
@@ -57,114 +66,176 @@ d3.select("#extracurricularFilter").on("change", function() {
 
 
 function updateAllVisualizations(filteredData) {
-  d3.select("#vis-studytime-gpa").selectAll("*").remove();
+  /*d3.select("#vis-studytime-gpa").selectAll("*").remove();
   d3.select("#vis-age-gpa").selectAll("*").remove();
   d3.select("#vis-parental-gpa").selectAll("*").remove();
 
   drawStudyTimeVsGPA(filteredData);
   drawAgeVsGPA(filteredData);
   drawParentalInfluence(filteredData);
+  */
+  // First chart: smooth animation (reuse SVG + points)
+  drawStudyTimeVsGPA(filteredData);
+
+  // Other charts: clear & redraw like before
+  d3.select("#vis-age-gpa").selectAll("*").remove();
+  d3.select("#vis-parental-gpa").selectAll("*").remove();
+
+  drawAgeVsGPA(filteredData);
+  drawParentalInfluence(filteredData);
+ 
 }
+  
 
 
+
+
+// Visualization 1: Study Time vs GPA (Scatter with trend line)
 // Visualization 1: Study Time vs GPA (Scatter with trend line)
 function drawStudyTimeVsGPA(data) {
   const margin = { top: 20, right: 20, bottom: 50, left: 60 };
   const width = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
-  const svg = d3.select("#vis-studytime-gpa")
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
+  // ----- SETUP / REUSE SVG + GROUP -----
+  let svgRoot = d3.select("#vis-studytime-gpa").select("svg");
+  let svg;
 
-  // -------------------------
-  // SCALES
-  // -------------------------
+  if (svgRoot.empty()) {
+    // First time: create SVG + inner group
+    svgRoot = d3.select("#vis-studytime-gpa")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom);
 
-  // X = GPA
+    svg = svgRoot.append("g")
+      .attr("class", "chart-root")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Axis groups (created once)
+    svg.append("g")
+      .attr("class", "x-axis")
+      .attr("transform", `translate(0,${height})`);
+
+    svg.append("g")
+      .attr("class", "y-axis");
+
+    // Axis labels (created once)
+    svg.append("text")
+      .attr("class", "x-label")
+      .attr("x", width / 2)
+      .attr("y", height + 40)
+      .attr("text-anchor", "middle")
+      .text("GPA");
+
+    svg.append("text")
+      .attr("class", "y-label")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -45)
+      .attr("text-anchor", "middle")
+      .text("Study Time Weekly (hours)");
+  } else {
+    svg = svgRoot.select("g.chart-root");
+  }
+
+  // ----- SCALES -----
   const x = d3.scaleLinear()
     .domain([-0.2, 4.2])
     .range([0, width]);
 
-  // Y = Study Time Weekly
   const y = d3.scaleLinear()
     .domain([0, 20])
     .nice()
     .range([height, 0]);
 
-  // -------------------------
-  // AXES
-  // -------------------------
-  svg.append("g")
-    .attr("transform", `translate(0,${height})`)
+  // ----- TRANSITION -----
+  const t = d3.transition().duration(800);
+
+  // ----- AXES (smooth transition) -----
+  svg.select(".x-axis")
+    .transition(t)
     .call(d3.axisBottom(x));
 
-  svg.append("g")
+  svg.select(".y-axis")
+    .transition(t)
     .call(d3.axisLeft(y));
 
-  // Axis labels
-  svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", height + 40)
-    .attr("text-anchor", "middle")
-    .text("GPA");
+  // ----- POINTS (data join + transitions) -----
+  const circles = svg.selectAll("circle")
+    .data(data, (d, i) => i);  // index key is fine here
 
-  svg.append("text")
-    .attr("transform", "rotate(-90)")
-    .attr("x", -height / 2)
-    .attr("y", -45)
-    .attr("text-anchor", "middle")
-    .text("Study Time Weekly (hours)");
+  // Exit: shrink then remove
+  circles.exit()
+    .transition(t)
+    .attr("r", 0)
+    .remove();
 
-  // -------------------------
-  // POINTS
-  // -------------------------
-  svg.selectAll("circle")
-    .data(data)
-    .enter()
+  // Update existing
+  circles
+    .transition(t)
+    .attr("cx", d => x(d.GPA))
+    .attr("cy", d => y(d.StudyTimeWeekly));
+
+  // Enter: grow from r=0
+  circles.enter()
     .append("circle")
     .attr("cx", d => x(d.GPA))
     .attr("cy", d => y(d.StudyTimeWeekly))
-    .attr("r", 3)
+    .attr("r", 0)
     .attr("fill", "steelblue")
-    .attr("opacity", 0.6);
+    .attr("opacity", 0.6)
+    .transition(t)
+    .attr("r", 3);
 
-  // -------------------------
-  // TREND LINE
-  // -------------------------
+  // ----- TREND LINE (smoothly move endpoints) -----
+  if (data.length > 1) {
+    const xMean = d3.mean(data, d => d.GPA);
+    const yMean = d3.mean(data, d => d.StudyTimeWeekly);
 
-  const xMean = d3.mean(data, d => d.GPA);
-  const yMean = d3.mean(data, d => d.StudyTimeWeekly);
+    let num = 0, den = 0;
+    data.forEach(d => {
+      const xDev = d.GPA - xMean;
+      const yDev = d.StudyTimeWeekly - yMean;
+      num += xDev * yDev;
+      den += xDev * xDev;
+    });
 
-  let num = 0, den = 0;
-  data.forEach(d => {
-    const xDev = d.GPA - xMean;
-    const yDev = d.StudyTimeWeekly - yMean;
-    num += xDev * yDev;
-    den += xDev * xDev;
-  });
+    const slope = den === 0 ? 0 : num / den;
+    const intercept = yMean - slope * xMean;
 
-  const slope = num / den;
-  const intercept = yMean - slope * xMean;
+    const xVals = [-0.2, 4.2];
+    const linePoints = xVals.map(xv => ({
+      x: xv,
+      y: slope * xv + intercept
+    }));
 
-  const xVals = [-0.2, 4.2];
-  const linePoints = xVals.map(xv => ({
-    x: xv,
-    y: slope * xv + intercept
-  }));
+    let line = svg.select("line.trend-line");
+    if (line.empty()) {
+      line = svg.append("line")
+        .attr("class", "trend-line")
+        .attr("stroke", "darkred")
+        .attr("stroke-width", 2);
+    }
 
-  svg.append("line")
-    .attr("x1", x(linePoints[0].x))
-    .attr("y1", y(linePoints[0].y))
-    .attr("x2", x(linePoints[1].x))
-    .attr("y2", y(linePoints[1].y))
-    .attr("stroke", "darkred")
-    .attr("stroke-width", 2);
+    line.transition(t)
+      .attr("x1", x(linePoints[0].x))
+      .attr("y1", y(linePoints[0].y))
+      .attr("x2", x(linePoints[1].x))
+      .attr("y2", y(linePoints[1].y))
+      .attr("stroke-width", 2);
+  } else {
+    // Not enough points -> hide line
+    svg.select("line.trend-line")
+      .transition(t)
+      .attr("stroke-width", 0);
+  }
 
+  return svgRoot;
 }
+
+
+
 //  Visualization 2: Age vs GPA (stacked by age, with hover + legend filter)
 function drawAgeVsGPA(data) {
   console.log("Drawing Age vs GPA (stacked by age)");
@@ -173,11 +244,20 @@ function drawAgeVsGPA(data) {
   const width  = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
-  const svg = d3.select("#vis-age-gpa")
+  /*const svg = d3.select("#vis-age-gpa")
     .append("svg")
     .attr("width",  width  + margin.left + margin.right)
     .attr("height", height + margin.top  + margin.bottom)
     .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+*/
+
+    const svgRoot = d3.select("#vis-age-gpa")
+    .append("svg")
+    .attr("width",  width  + margin.left + margin.right)
+    .attr("height", height + margin.top  + margin.bottom);
+
+    const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   // ---- Get unique ages and create GPA bins ----
@@ -424,6 +504,8 @@ applyAgeFilter();
   applyAgeFilter();
 
   console.log("Age vs GPA drawn (stacked with hover + legend filter).");
+
+  return svgRoot;
 }
 
 // Visualization 3: Effect of Parental Education/Support on GPA (with legend series toggle)
@@ -433,12 +515,23 @@ function drawParentalInfluence(data) {
   const margin = { top: 20, right: 60, bottom: 50, left: 60 };
   const width  = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
-
+/*
   const svg = d3.select("#vis-parental-gpa")
     .append("svg")
     .attr("width",  width  + margin.left + margin.right)
     .attr("height", height + margin.top  + margin.bottom)
     .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+*/
+
+
+
+  const svgRoot = d3.select("#vis-parental-gpa")
+    .append("svg")
+    .attr("width",  width  + margin.left + margin.right)
+    .attr("height", height + margin.top  + margin.bottom);
+
+  const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   // ---------------------------------
@@ -706,4 +799,6 @@ function drawParentalInfluence(data) {
   applySeriesFilter();
 
   console.log("Effect of Parental Education/Support on GPA drawn (with legend series toggle).");
+
+  return svgRoot;
 }
