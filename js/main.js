@@ -751,8 +751,7 @@ function drawAgeVsGPA(data) {
     .attr("class", "legend-item")
     .style("cursor", "pointer")
     .on("click", (event, d) => {
-      genderKey = +d.key;
-      selectedAge = (selectedAge === genderKey ? null : genderKey);
+      selectedAge = (selectedAge === d ? null : d);
       const filteredData = getCurrentFilteredData();
       updateAllVisualizations(filteredData);
     })
