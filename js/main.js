@@ -214,7 +214,7 @@ function drawStudyTimeVsGPA(data) {
     if (legend.empty()) {
       legend = svg.append("g")
       .attr("class", "gender-legend")
-      .attr("transform", `translate(${width - 120}, 10)`);
+      .attr("transform", `translate(${width - 50}, 10)`);
     }
   } else {
     svg = svgRoot.select("g.chart-root");
