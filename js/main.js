@@ -142,9 +142,6 @@ function updateAllVisualizations(filteredData) {
 // VISUALIZATION 1: Study Time vs GPA
 function drawStudyTimeVsGPA(data) {
 
-  if (selectedGender !== null) {
-    data = data.filter(d => d.Gender === selectedGender);
-  }
 
   const margin = { top: 20, right: 20, bottom: 50, left: 60 };
   const width = 600 - margin.left - margin.right;
@@ -256,7 +253,9 @@ function drawStudyTimeVsGPA(data) {
   circles
     .transition(t)
     .attr("cx", d => x(d.GPA))
-    .attr("cy", d => y(d.StudyTimeWeekly));
+    .attr("cy", d => y(d.StudyTimeWeekly))
+    .attr("fill", d => genderColor(d.Gender));
+    
 
   // ENTER new circles
   const circlesEnter = circles.enter()
@@ -304,17 +303,6 @@ const legendEnter = legendItems.enter()
     .style("font-size", "12px");
 
   legendItems.exit().remove();
-
-  /*const legendEnter = legendItems.enter()
-    .append("g")
-    .attr("class", "legend-item")
-    .style("cursor", "pointer")
-    .on("click", (event, age) => {
-      // toggle this age; combined filters handled by getCurrentFilteredData()
-      selectedAge = (selectedAge === age ? null : age);
-      const filteredData = getCurrentFilteredData();
-      updateAllVisualizations(filteredData);
-    })*/
 
 
   // MERGE for shared event handlers
@@ -762,9 +750,9 @@ function drawAgeVsGPA(data) {
     .append("g")
     .attr("class", "legend-item")
     .style("cursor", "pointer")
-    .on("click", (event, age) => {
-      // toggle this age; combined filters handled by getCurrentFilteredData()
-      selectedAge = (selectedAge === age ? null : age);
+    .on("click", (event, d) => {
+      genderKey = +d.key;
+      selectedAge = (selectedAge === genderKey ? null : genderKey);
       const filteredData = getCurrentFilteredData();
       updateAllVisualizations(filteredData);
     })
