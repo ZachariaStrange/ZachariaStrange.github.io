@@ -149,11 +149,20 @@ function updateAllVisualizations(filteredData) {
 
 
 
-
+// VISUALIZATION 1: Study Time vs GPA
 function drawStudyTimeVsGPA(data) {
+
+  if (selectedGender !== null) {
+    data = data.filter(d => d.Gender === selectedGender);
+  }
+
   const margin = { top: 20, right: 20, bottom: 50, left: 60 };
   const width = 600 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
+
+  const genderColor = d3.scaleOrdinal()
+    .domain([0, 1])
+    .range(["steelblue", "pink"]); 
 
   // ----- CREATE / REUSE TOOLTIP DIV -----
   if (!studyTooltip) {
@@ -210,6 +219,13 @@ function drawStudyTimeVsGPA(data) {
       .attr("y", -45)
       .attr("text-anchor", "middle")
       .text("Study Time Weekly (hours)");
+
+    let legend = svgRoot.select("g.gender-legend");
+    if (legend.empty()) {
+      legend = svg.append("g")
+      .attr("class", "gender-legend")
+      .attr("transform", `translate(${width - 120}, 10)`);
+    }
   } else {
     svg = svgRoot.select("g.chart-root");
   }
@@ -259,8 +275,57 @@ function drawStudyTimeVsGPA(data) {
     .attr("cx", d => x(d.GPA))
     .attr("cy", d => y(d.StudyTimeWeekly))
     .attr("r", 0)
-    .attr("fill", "steelblue")
+    .attr("fill", d => genderColor(d.Gender))
     .attr("opacity", 0.6);
+
+    // ---- GENDER LEGEND ----x
+const legendData = [
+  { key: "0", label: "Male" },
+  { key: "1", label: "Female" }
+];
+
+let legendItems = svg.select("g.gender-legend")
+  .selectAll(".gender-item")
+  .data(legendData, d => d.key);
+
+const legendEnter = legendItems.enter()
+  .append("g")
+  .attr("class", "gender-item")
+  .attr("transform", (d, i) => `translate(0, ${i * 20})`)
+  .style("cursor", "pointer")
+  .on("click", (event, d) => {
+    const genderKey = +d.key;
+    // toggle logic
+    selectedGender = (selectedGender === genderKey ? null : genderKey);
+      const filteredData = getCurrentFilteredData();
+      updateAllVisualizations(filteredData);
+  });
+
+  legendEnter.append("rect")
+    .attr("width", 14)
+    .attr("height", 14)
+    .attr("fill", d => genderColor(d.key))
+    .attr("stroke", "#333");
+
+  legendEnter.append("text")
+    .attr("x", 20)
+    .attr("y", 12)
+    .text(d => d.label)
+    .style("font-size", "12px");
+
+  legendItems.exit().remove();
+
+  /*const legendEnter = legendItems.enter()
+    .append("g")
+    .attr("class", "legend-item")
+    .style("cursor", "pointer")
+    .on("click", (event, age) => {
+      // toggle this age; combined filters handled by getCurrentFilteredData()
+      selectedAge = (selectedAge === age ? null : age);
+      const filteredData = getCurrentFilteredData();
+      updateAllVisualizations(filteredData);
+    })*/
+
 
   // MERGE for shared event handlers
   const allCircles = circlesEnter.merge(circles);
@@ -312,7 +377,6 @@ function drawStudyTimeVsGPA(data) {
     .transition(t)
     .attr("r", 3);  // default radius after animation
 
-   // ----- TREND LINE (smoothly move endpoints + tooltip) -----
   // ----- TREND LINE (smoothly move endpoints + tooltip for equation) -----
 if (data.length > 1) {
   const xMean = d3.mean(data, d => d.GPA);
@@ -348,6 +412,8 @@ if (data.length > 1) {
     .attr("y1", y(linePoints[0].y))
     .attr("x2", x(linePoints[1].x))
     .attr("y2", y(linePoints[1].y));
+
+  
 
   // ===== TOOLTIP FOR TREND LINE EQUATION =====
   // Build a nice y = m x + b string
