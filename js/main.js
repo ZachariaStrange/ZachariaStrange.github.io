@@ -54,16 +54,6 @@ d3.csv("Student_performance_data.csv", d => ({
    // Initial draw with "no filters" (all selected* are null)
   updateAllVisualizations(getCurrentFilteredData());
 
-  // --- GENDER filter ---
-  d3.select("#genderFilter").on("change", function() {
-    if (this.value === "") {
-      selectedGender = null;
-    } else {
-      selectedGender = +this.value; // 0 or 1
-    }
-    updateAllVisualizations(getCurrentFilteredData());
-  });
-
   // --- TUTORING filter ---
   d3.select("#tutorFilter").on("change", function() {
     if (this.value === "") {
